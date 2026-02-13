@@ -1,0 +1,1538 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Coach Übungen</title>
+  <meta name="theme-color" content="#ff7a00" />
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a30;
+      --card:#101e38;
+      --card2:#0e1a33;
+      --text:#eef3ff;
+      --muted:#97a7c4;
+      --line:rgba(255,255,255,.08);
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --orange:#ff7a00;
+      --orange2:#ffb25a;
+      --good:#2dd4bf;
+      --danger:#fb7185;
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:
+        radial-gradient(900px 520px at 15% -10%, rgba(255,122,0,.25), transparent 60%),
+        radial-gradient(700px 380px at 110% 0%, rgba(255,178,90,.18), transparent 55%),
+        radial-gradient(700px 420px at 50% 120%, rgba(45,212,191,.10), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Layout */
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: env(safe-area-inset-top) 14px calc(14px + env(safe-area-inset-bottom));
+      min-height: 100%;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    /* Top bar */
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 10px 0 8px;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(to bottom, rgba(11,18,32,.92), rgba(11,18,32,.62));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .logo{
+      width:40px;height:40px;border-radius:14px;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      box-shadow: 0 18px 40px rgba(255,122,0,.28);
+      flex:0 0 auto;
+      position:relative;
+    }
+    .logo:after{
+      content:"";
+      position:absolute; inset:10px;
+      border-radius:10px;
+      background: rgba(255,255,255,.18);
+      transform: rotate(18deg);
+    }
+    .titlewrap{min-width:0}
+    .title{
+      margin:0;
+      font-size:15px;
+      font-weight:950;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .subtitle{
+      margin:2px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .hActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-weight:900;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{
+      border-color: transparent;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      box-shadow: 0 18px 40px rgba(255,122,0,.25);
+      color:#1a1208;
+    }
+    .btn.ghost{
+      background: rgba(255,122,0,.10);
+      border-color: rgba(255,122,0,.22);
+      box-shadow:none;
+      color: #ffd9b3;
+    }
+    .btn.danger{
+      background: rgba(251,113,133,.10);
+      border-color: rgba(251,113,133,.22);
+      box-shadow:none;
+      color: #ffd1d9;
+    }
+
+    /* Content */
+    main{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding-bottom: 72px; /* space for bottom tabs */
+    }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(16,30,56,.78), rgba(16,30,56,.55));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panelHead{
+      padding: 12px 12px 10px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(16,30,56,.92), rgba(16,30,56,.62));
+    }
+    .panelHead h2{margin:0;font-size:13px;font-weight:950;letter-spacing:.2px}
+    .panelHead p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+    .panelBody{padding:12px}
+
+    .field{
+      display:flex; gap:10px; align-items:center;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    }
+    .field input{
+      width:100%;
+      border:0; outline:none;
+      background: transparent;
+      color: var(--text);
+      font-size:14px;
+    }
+    .field .k{
+      font-weight:900;
+      color: rgba(255,255,255,.72);
+      font-size:12px;
+      padding: 6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+
+    .chips{
+      display:flex; flex-wrap:wrap; gap:8px;
+      margin-top: 10px;
+    }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.05);
+      font-weight:950;
+      font-size:12px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .chip[data-on="1"]{
+      border-color: rgba(255,122,0,.40);
+      background: rgba(255,122,0,.12);
+      color: #ffe5c7;
+    }
+    .chip .dot{
+      width:10px;height:10px;border-radius:50%;
+      background: rgba(255,255,255,.18);
+    }
+    .chip[data-on="1"] .dot{
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+    }
+
+    .list{display:flex;flex-direction:column;gap:10px}
+    .card{
+      display:flex; gap:12px; align-items:stretch; justify-content:space-between;
+      padding:12px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04));
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 16px 40px rgba(0,0,0,.28);
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .thumb{
+      width:64px; height:64px;
+      border-radius: 14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
+      flex:0 0 auto;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .thumb .ph{font-size:11px;color:var(--muted);text-align:center;padding:6px;line-height:1.2}
+    .meta{min-width:0;flex:1}
+    .meta .t{
+      margin:0;
+      font-size:14px;
+      font-weight:950;
+      line-height:1.2;
+    }
+    .meta .s{
+      margin:7px 0 0;
+      display:flex; gap:8px; flex-wrap:wrap;
+      color: var(--muted);
+      font-size:12px;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.10);
+      color: rgba(255,255,255,.78);
+      font-weight:900;
+      font-size:11px;
+    }
+    .iconbtn{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border-radius:999px;
+      padding: 10px 12px;
+      min-width:44px;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      flex:0 0 auto;
+    }
+    .iconbtn[data-on="1"]{
+      border-color: rgba(255,122,0,.40);
+      background: rgba(255,122,0,.14);
+      color:#ffe5c7;
+    }
+    .empty{
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px dashed rgba(255,255,255,.16);
+      background: rgba(0,0,0,.16);
+      color: var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    /* Bottom tab bar (iPhone friendly) */
+    .tabs{
+      position: fixed;
+      left:0; right:0;
+      bottom: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(11,18,32,.92), rgba(11,18,32,.65));
+      border-top: 1px solid rgba(255,255,255,.07);
+      backdrop-filter: blur(14px);
+      z-index: 30;
+    }
+    .tabRow{
+      max-width: 980px;
+      margin: 0 auto;
+      display:flex; gap:10px;
+    }
+    .tab{
+      flex:1;
+      border-radius: 16px;
+      padding: 12px 10px;
+      text-align:center;
+      font-weight:1000;
+      font-size:12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.05);
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      color: rgba(255,255,255,.84);
+    }
+    .tab[data-on="1"]{
+      border-color: transparent;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      color:#1a1208;
+      box-shadow: 0 18px 40px rgba(255,122,0,.20);
+    }
+
+    /* Modal */
+    .backdrop{
+      position: fixed;
+      inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      padding: 12px;
+      z-index: 60;
+    }
+    .backdrop[data-open="1"]{display:flex}
+    .modal{
+      width: min(980px, 100%);
+      max-height: 88vh;
+      background: linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 22px;
+      box-shadow: 0 35px 90px rgba(0,0,0,.55);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+    .mHead{
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+      background: linear-gradient(135deg, rgba(255,122,0,.12), rgba(16,30,56,.88) 55%);
+    }
+    .mHead h3{margin:0;font-size:16px;font-weight:1000}
+    .mSub{margin:6px 0 0;display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+    .mBody{padding:12px;overflow:auto}
+    .mRow{display:flex;gap:8px;flex-wrap:wrap}
+    .close{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 12px;
+      cursor:pointer;
+      font-weight:1000;
+      min-width:44px;
+    }
+    .split{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+    .preview{
+      border-radius: 18px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      box-shadow: 0 18px 45px rgba(0,0,0,.30);
+    }
+    .preview img{width:100%;height:auto;display:block;border-bottom:1px solid rgba(255,255,255,.08)}
+    textarea{
+      width:100%;
+      min-height: 110px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      padding: 12px;
+      outline:none;
+      resize: vertical;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .note{
+      margin-top:10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,122,0,.20);
+      background: rgba(255,122,0,.10);
+      color: #ffe5c7;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .err{
+      margin-top:10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(251,113,133,.25);
+      background: rgba(251,113,133,.10);
+      color: #ffd1d9;
+      font-size:13px;
+      line-height:1.35;
+      display:none;
+    }
+
+    /* iPhone first tweaks */
+    @media (min-width: 860px){
+      .split{grid-template-columns: 1.1fr 1fr}
+      main{padding-bottom: 86px;}
+      .thumb{width:72px;height:72px}
+    }
+    code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="titlewrap">
+            <p class="title">Coach Übungen</p>
+            <p class="subtitle" id="subline">Kategorien nach Inhaltsverzeichnis • Trainings • PDF Export</p>
+          </div>
+        </div>
+        <div class="hActions">
+          <button class="btn" id="btnExportData">Daten</button>
+          <button class="btn danger" id="btnReset">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <h2 id="leftTitle">Suche & Filter</h2>
+            <p id="leftSub">Tippe z.B. „closeout“, „dominoes“, „touch action“</p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn primary" id="btnNewTraining">+ Training</button>
+          </div>
+        </div>
+        <div class="panelBody">
+          <div class="field">
+            <span class="k">⌕</span>
+            <input id="search" type="text" placeholder="Suche (Name, 1-on-1, 3-on-3, ...)" autocomplete="off" />
+          </div>
+          <div class="chips" id="chips"></div>
+          <div class="note" id="hintBox">
+            <b>Wichtig:</b> Damit die App deine vielen PNGs automatisch findet:
+            <br>• Lokal (Python Server) funktioniert es meist auch ohne extra Datei.
+            <br>• Für GitHub Pages brauchst du <code>assets/previews/manifest.json</code> (siehe unten im Daten-Export).
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <h2 id="rightTitle">Übungen</h2>
+            <p id="rightSub">Tippe eine Übung an → Vorschau → zu Training / Favorit</p>
+          </div>
+        </div>
+        <div class="panelBody">
+          <div class="list" id="list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Bottom Tabs -->
+  <div class="tabs">
+    <div class="tabRow">
+      <button class="tab" id="tabExercises" data-on="1">Übungen</button>
+      <button class="tab" id="tabTrainings" data-on="0">Trainings</button>
+      <button class="tab" id="tabFavs" data-on="0">Favoriten</button>
+    </div>
+  </div>
+
+  <!-- Exercise Modal -->
+  <div class="backdrop" id="exBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3 id="exTitle">Übung</h3>
+          <div class="mSub" id="exMeta"></div>
+        </div>
+        <button class="close" id="exClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn" id="exFavBtn">☆ Favorit</button>
+          <button class="btn primary" id="exAddBtn">＋ Zu Training</button>
+          <button class="btn ghost" id="exOpenShots">🖼️ Bilder öffnen</button>
+        </div>
+
+        <div class="split">
+          <div class="preview" id="exPreview"></div>
+          <div>
+            <div class="pill" style="display:inline-flex;margin-bottom:8px">📝 Notizen (optional)</div>
+            <textarea id="exNotes" placeholder="Coaching Notes…"></textarea>
+            <div class="mRow" style="margin-top:10px">
+              <button class="btn primary" id="exSaveNotes">Notizen speichern</button>
+              <button class="btn" id="exEditCat">Kategorie ändern</button>
+            </div>
+            <div class="err" id="exErr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Training -->
+  <div class="backdrop" id="addBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3>Zu welchem Training?</h3>
+          <div class="mSub" id="addMeta"></div>
+        </div>
+        <button class="close" id="addClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn primary" id="addCreate">+ Neues Training</button>
+        </div>
+        <div style="height:10px"></div>
+        <div class="list" id="addList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training Editor -->
+  <div class="backdrop" id="trBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3 id="trTitle">Training</h3>
+          <div class="mSub" id="trMeta"></div>
+        </div>
+        <button class="close" id="trClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn primary" id="trExportPdf">⬇ Export als PDF</button>
+          <button class="btn" id="trRename">Umbenennen</button>
+          <button class="btn" id="trDuplicate">Duplizieren</button>
+          <button class="btn danger" id="trDelete">Löschen</button>
+        </div>
+        <div class="note" style="margin-top:10px">
+          PDF-Export fügt <b>alle Screenshots</b> der Übungen in <b>eine neue PDF</b> ein (inkl. Notizen).
+        </div>
+        <div style="height:10px"></div>
+        <div class="list" id="trList"></div>
+        <div class="empty" id="trEmpty" style="display:none">Keine Übungen im Training.</div>
+        <div class="note" style="margin-top:10px">
+          <b>Offline PDF Export:</b> Lege <code>jspdf.umd.min.js</code> in <code>assets/libs/</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    /* =========================
+       Kategorien nach Inhaltsverzeichnis
+       ========================= */
+    const CATEGORIES = [
+      "FINISHING",
+      "CLOSEOUTS",
+      "SHOOTING",
+      "DRIBBLING",
+      "PASSING",
+      "DEFENSE",
+      "POST",
+      "REBOUNDING",
+      "PLAYER DEV MIX ACTIVITIES",
+      "TEAM DEV MIX ACTIVITIES",
+      "TRIGGERS",
+      "TRANSITION",
+      "PICK AND ROLL",
+      "DOMINOES REACTIONS",
+      "WARM-UPS & ENERGIZERS"
+    ];
+
+    // Heuristik-Regeln (du kannst später Kategorien manuell pro Übung ändern – wird gespeichert)
+    function guessCategoryFromName(filename){
+      const f = filename.toLowerCase();
+
+      // Warmups/Energizers (aus Contents)
+      const warm = ["bing-bang-bong","capture-the-flag","circle-tag","circle-touch","cone-reaction",
+                    "pylon-exchanges","rock-paper-scissors","sheep-and-wolf-tag","stance-games","stack-start",
+                    "surprise-game","team-scoring-system","tennis-ball","tic-tac-toe","red-light-green-light",
+                    "pac-man-tag","hunter-tag","line-tag","mirror-dribbling","push-out-races","four-spots",
+                    "pass-tag","take-two-passing","animals-game","breakout-and-baseball","fortnite","cambio-game",
+                    "battleship","attack-the-mouse-turtle","ppp-scoring","scrambletouchgame","pylon-dribbles"];
+      if(warm.some(k => f.includes(k))) return "WARM-UPS & ENERGIZERS";
+
+      // Dominoes
+      if(f.includes("dominoes") || f.includes("domino")) return "DOMINOES REACTIONS";
+
+      // Transition
+      const trans = ["outlet","transition","wheel-start","train-transition","skip-or-push","continuous-hc","x-out","leak-out"];
+      if(trans.some(k => f.includes(k))) return "TRANSITION";
+
+      // Triggers
+      const trig = ["cross-screen","touch-action","scram-switch","swing-to-random-pnr"];
+      if(trig.some(k => f.includes(k))) return "TRIGGERS";
+
+      // Pick & Roll
+      const pnr = ["pick","coverage","australia","gentleman-stance","twist-vs-under","smash-or-slip","gets","lateral-stack","stack-pnr","hi-lo-vs-switch","what-weapon-vs-switch"];
+      if(pnr.some(k => f.includes(k))) return "PICK AND ROLL";
+
+      // Rebounding
+      if(f.includes("rebound")) return "REBOUNDING";
+
+      // Post
+      if(f.includes("post") || f.includes("deep-hooks") || f.includes("deep-seals") || f.includes("t-post")) return "POST";
+
+      // Passing
+      const pass = ["passing","ping-pong","tennis","grid-passing","make-a-lead"];
+      if(pass.some(k => f.includes(k))) return "PASSING";
+
+      // Shooting
+      if(f.includes("shooting") || f.includes("quick-ups") || f.includes("push-off")) return "SHOOTING";
+
+      // Dribbling
+      const drib = ["dribble","dribbling","change-of-speed","grid","hip-turn","guided-skates","guided-hip-turn","spanish-dribbles","straight-line-or-counter","sumo","through-the-gate"];
+      if(drib.some(k => f.includes(k))) return "DRIBBLING";
+
+      // Defense
+      const def = ["seven-seconds","chest-blows","close-the-gate","lane-turns","protect-the-paint","open-and-chase","mirror-game","shadow","sideline-angle"];
+      if(def.some(k => f.includes(k))) return "DEFENSE";
+
+      // Closeouts
+      const close = ["close-out","closeout","cone-blasts","cone-touch","multi-skip-and-close-out","sprint-ins","sprint-pick-up","blast-pick-up","blasts-cone-gate","bounce-close-outs","guided-catch-footwork"];
+      if(close.some(k => f.includes(k))) return "CLOSEOUTS";
+
+      // Finishing (Fallback für viele 1-on-1 Basics)
+      const fin = ["finishes","finish","around-the-arc","blind-start","block","bump-tap","cat-and-mouse","chasedown","continuous-posters","corner-finishes",
+                   "double-contest","elbow-touches","five-spots","guided-series","guided-vs-primary-def","hi-5","loop","multi-primary-and-stunt",
+                   "octopus","paint-escape","surprise-hand-off","trail","wing-finishes","wing-touchdown","perceptual-finishes","find-a-space"];
+      if(fin.some(k => f.includes(k))) return "FINISHING";
+
+      // Team / Player Dev Mix (hier schwer zu erkennen → Default TEAM)
+      const team = ["4-on-5","5-on-5","6-on-5","3-on-3","4-on-4","2-on-2","2-on-3","2-on-0","1-on-2","1-on-3","2-on-1","2-on-1-plus-1","1-on-1-plus-1","1-on-1-plus-2"];
+      if(team.some(k => f.includes(k))) return "TEAM DEV MIX ACTIVITIES";
+
+      return "PLAYER DEV MIX ACTIVITIES";
+    }
+
+    /* =========================
+       Storage Keys
+       ========================= */
+    const LS = {
+      tab: "coach_tab_final_v1",
+      cats: "coach_cats_final_v1",
+      fav: "coach_fav_final_v1",
+      notes: "coach_notes_final_v1",
+      trainings: "coach_trainings_final_v1",
+      catOverrides: "coach_cat_overrides_final_v1",
+      manifestCache: "coach_manifest_cache_final_v1"
+    };
+
+    /* =========================
+       Helpers
+       ========================= */
+    const $ = (id)=>document.getElementById(id);
+    function loadJSON(key, fallback){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):fallback; }catch(e){ return fallback; } }
+    function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+    function escapeHTML(s){ return (s+"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
+    function norm(s){
+      return (s||"")
+        .toLowerCase()
+        .replaceAll("ä","ae").replaceAll("ö","oe").replaceAll("ü","ue").replaceAll("ß","ss")
+        .replace(/[^a-z0-9]+/g," ")
+        .trim();
+    }
+    function tokenize(q){ const n=norm(q); return n? n.split(/\s+/).filter(Boolean):[]; }
+    function titleFromBase(base){
+      // base like "1-on-1-plus-1-deep-seals" -> pretty title
+      let t = base.replace(/\.png$/i,"");
+      t = t.replace(/-([0-9]+)$/,""); // remove "-1" suffix (if passed)
+      t = t.replaceAll("-", " ");
+      // normalize some patterns
+      t = t.replace(/\bplus\b/g, "+");
+      t = t.replace(/\b(on)\b/g, "on");
+      // Title Case-ish
+      t = t.split(" ").filter(Boolean).map(w=>{
+        if(/^[0-9]+$/.test(w)) return w;
+        if(w==="on" || w==="vs") return w;
+        if(w==="pnr") return "PNR";
+        if(w.length<=2 && w.includes("+")) return w;
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(" ");
+      // Fix "1 On 1" to "1-on-1"
+      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2");
+      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2-on-$3");
+      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sPlus\s([0-9]+)\b/g, "$1-on-$2+$3");
+      t = t.replace(/\s+/g," ").trim();
+      return t;
+    }
+
+    function baseKeyFromFilename(filename){
+      // group multi-image drills like "...-1.png", "...-2.png"
+      let f = filename.replace(/^.*\//,""); // strip folder if any
+      f = f.replace(/\.png$/i,"");
+      f = f.replace(/-[0-9]+$/,""); // remove trailing -1/-2
+      return f;
+    }
+
+    function sortByNumberSuffix(a,b){
+      // for images within same base: -1, -2, else 0
+      const na = (a.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(a.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+      const nb = (b.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(b.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+      return na - nb;
+    }
+
+    function nowId(){ return "tr_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16); }
+
+    /* =========================
+       App State
+       ========================= */
+    let activeTab = loadJSON(LS.tab, "exercises"); // exercises|trainings|favs
+    let selectedCats = loadJSON(LS.cats, []); // category filters
+    let favorites = new Set(loadJSON(LS.fav, []));
+    let notesById = loadJSON(LS.notes, {});
+    let trainings = loadJSON(LS.trainings, []);
+    let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
+    let EXERCISES = []; // loaded from manifest/listing
+
+    const searchEl = $("search");
+    const chipsEl = $("chips");
+    const listEl = $("list");
+
+    /* =========================
+       Loader: manifest.json first, fallback parse directory listing (works on Python server)
+       ========================= */
+    async function loadManifestJson(){
+      const res = await fetch("assets/previews/manifest.json", { cache: "no-cache" });
+      if(!res.ok) throw new Error("manifest.json nicht gefunden");
+      const data = await res.json();
+      if(!data || !Array.isArray(data.files)) throw new Error("manifest.json Format falsch");
+      return data.files;
+    }
+
+    function parseLinksFromDirectoryHtml(html){
+      // parse href="...png" links
+      const files = [];
+      const re = /href="([^"]+?\.png)"/gi;
+      let m;
+      while((m=re.exec(html))!==null){
+        let href = m[1];
+        // ignore parent link
+        if(href.startsWith("?") || href.startsWith("/") || href.includes("..")) continue;
+        // decode and strip query
+        href = href.split("?")[0];
+        // python server listing returns raw filenames; keep them
+        files.push(href);
+      }
+      // also accept percent-encoded
+      return Array.from(new Set(files));
+    }
+
+    async function loadFromDirectoryListing(){
+      const res = await fetch("assets/previews/", { cache: "no-cache" });
+      if(!res.ok) throw new Error("Directory listing nicht erreichbar");
+      const html = await res.text();
+      return parseLinksFromDirectoryHtml(html);
+    }
+
+    async function loadAllExercises(){
+      let files = [];
+      // 1) try manifest.json (needed for GitHub Pages)
+      try{
+        files = await loadManifestJson();
+      }catch(e){
+        // 2) fallback: directory listing (works on python -m http.server)
+        try{
+          files = await loadFromDirectoryListing();
+        }catch(e2){
+          // 3) fallback: cached manifest from last successful run
+          const cached = loadJSON(LS.manifestCache, []);
+          if(Array.isArray(cached) && cached.length) files = cached;
+          else files = [];
+        }
+      }
+
+      if(files.length){
+        saveJSON(LS.manifestCache, files);
+      }
+
+      // normalize: accept either full paths or just filenames
+      const resolved = files
+        .filter(f => typeof f === "string")
+        .map(f => f.trim())
+        .filter(Boolean)
+        .map(f => f.startsWith("assets/") ? f : ("assets/previews/" + f));
+
+      // group by base key
+      const groups = new Map();
+      for(const full of resolved){
+        const filename = full.replace(/^.*\//,"");
+        if(!filename.toLowerCase().endsWith(".png")) continue;
+
+        const base = baseKeyFromFilename(filename);
+        if(!groups.has(base)) groups.set(base, []);
+        groups.get(base).push(full);
+      }
+
+      // build exercises
+      const exercises = [];
+      for(const [base, arr] of groups.entries()){
+        arr.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
+        const id = base; // stable id
+        const title = titleFromBase(base);
+        const category = catOverrides[id] || guessCategoryFromName(base);
+        exercises.push({
+          id,
+          title,
+          base,
+          category,
+          screenshots: arr
+        });
+      }
+
+      // sort by category, then title
+      exercises.sort((a,b)=>{
+        const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+        const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+        return c !== 0 ? c : a.title.localeCompare(b.title);
+      });
+
+      EXERCISES = exercises;
+
+      // update subtitle
+      $("subline").textContent = `${EXERCISES.length} Übungen geladen • Trainings • PDF Export`;
+    }
+
+    /* =========================
+       UI Render
+       ========================= */
+    function setTab(tab){
+      activeTab = tab;
+      saveJSON(LS.tab, activeTab);
+
+      $("tabExercises").setAttribute("data-on", tab==="exercises" ? "1":"0");
+      $("tabTrainings").setAttribute("data-on", tab==="trainings" ? "1":"0");
+      $("tabFavs").setAttribute("data-on", tab==="favs" ? "1":"0");
+
+      if(tab==="trainings"){
+        $("rightTitle").textContent = "Trainings";
+        $("rightSub").textContent = "Training öffnen → Reihenfolge → Export als PDF";
+      }else if(tab==="favs"){
+        $("rightTitle").textContent = "Favoriten";
+        $("rightSub").textContent = "Nur deine Favoriten (mit Filter & Suche)";
+      }else{
+        $("rightTitle").textContent = "Übungen";
+        $("rightSub").textContent = "Tippe eine Übung → Vorschau → zu Training / Favorit";
+      }
+      render();
+    }
+
+    function renderChips(){
+      chipsEl.innerHTML = CATEGORIES.map(cat=>{
+        const on = selectedCats.includes(cat) ? "1":"0";
+        return `<div class="chip" data-cat="${escapeHTML(cat)}" data-on="${on}" role="button" tabindex="0">
+          <span class="dot"></span><span>${escapeHTML(cat)}</span></div>`;
+      }).join("");
+
+      chipsEl.querySelectorAll(".chip").forEach(ch=>{
+        const cat = ch.getAttribute("data-cat");
+        const toggle = ()=>{
+          selectedCats = selectedCats.includes(cat)
+            ? selectedCats.filter(x=>x!==cat)
+            : [...selectedCats, cat];
+          saveJSON(LS.cats, selectedCats);
+          render();
+        };
+        ch.addEventListener("click", toggle);
+        ch.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); }});
+      });
+    }
+
+   function matches(ex, tokens){
+  if(tokens.length === 0) return true;
+
+  const haystack = norm([
+    ex.title,
+    ex.category,
+    ex.base
+  ].join(" "));
+
+  return tokens.every(token => haystack.indexOf(token) !== -1);
+}
+    
+
+    function visibleExercises(){
+      const tokens = tokenize(searchEl.value);
+      let base = EXERCISES.slice();
+      if(activeTab==="favs") base = base.filter(e => favorites.has(e.id));
+      if(selectedCats.length) base = base.filter(e => selectedCats.includes(e.category));
+      if(tokens.length) base = base.filter(e => matches(e, tokens));
+      return base;
+    }
+
+    function renderExercises(){
+      const items = visibleExercises();
+      if(!items.length){
+        listEl.innerHTML = `<div class="empty">Keine Treffer. Prüfe Filter oder Suche.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = items.map(ex=>{
+        const favOn = favorites.has(ex.id) ? "1":"0";
+        const sc = (ex.screenshots||[]).length;
+        const thumb = ex.screenshots?.[0] || "";
+        return `<div class="card" data-id="${escapeHTML(ex.id)}" role="button" tabindex="0">
+          <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="preview">` : `<div class="ph">kein Bild</div>`}</div>
+          <div class="meta">
+            <p class="t">${escapeHTML(ex.title)}</p>
+            <div class="s">
+              <span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+              <span class="pill">🖼 ${sc} Bild${sc===1?"":"er"}</span>
+            </div>
+          </div>
+          <button class="iconbtn" data-on="${favOn}" aria-label="Favorit">${favOn==="1"?"★":"☆"}</button>
+        </div>`;
+      }).join("");
+
+      listEl.querySelectorAll(".card").forEach(card=>{
+        const id = card.getAttribute("data-id");
+        const favBtn = card.querySelector(".iconbtn");
+        favBtn.addEventListener("click",(e)=>{
+          e.stopPropagation();
+          toggleFav(id);
+          render();
+        });
+        const open = ()=>openExercise(id);
+        card.addEventListener("click", open);
+        card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+      });
+    }
+
+    function renderTrainings(){
+      if(!trainings.length){
+        listEl.innerHTML = `<div class="empty">Noch kein Training. Tippe oben auf <b>+ Training</b>.</div>`;
+        return;
+      }
+      const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      listEl.innerHTML = sorted.map(tr=>{
+        const n = (tr.items||[]).length;
+        return `<div class="card" data-tr="${escapeHTML(tr.id)}" role="button" tabindex="0">
+          <div class="thumb"><div class="ph">TR</div></div>
+          <div class="meta">
+            <p class="t">${escapeHTML(tr.name)}</p>
+            <div class="s">
+              <span class="pill">🧩 ${n} Übung${n===1?"":"en"}</span>
+              <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||tr.createdAt||Date.now()).toLocaleString())}</span>
+            </div>
+          </div>
+          <button class="iconbtn" aria-label="Bearbeiten">✎</button>
+        </div>`;
+      }).join("");
+
+      listEl.querySelectorAll(".card").forEach(card=>{
+        const id = card.getAttribute("data-tr");
+        const open = ()=>openTraining(id);
+        card.addEventListener("click", open);
+        card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+        card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); open(); });
+      });
+    }
+
+    function render(){
+      renderChips();
+      if(activeTab==="trainings") renderTrainings();
+      else renderExercises();
+    }
+
+    function toggleFav(id){
+      if(favorites.has(id)) favorites.delete(id);
+      else favorites.add(id);
+      saveJSON(LS.fav, Array.from(favorites));
+    }
+
+    /* =========================
+       Exercise Modal
+       ========================= */
+    let currentExercise = null;
+
+    function openExercise(id){
+      const ex = EXERCISES.find(x=>x.id===id);
+      if(!ex) return;
+      currentExercise = ex;
+
+      $("exTitle").textContent = ex.title;
+      $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+        <span class="pill">🖼 ${(ex.screenshots||[]).length} Bild${(ex.screenshots||[]).length===1?"":"er"}</span>`;
+      $("exFavBtn").textContent = favorites.has(ex.id) ? "★ Favorit" : "☆ Favorit";
+      $("exNotes").value = notesById[ex.id] || "";
+      $("exErr").style.display="none";
+
+      const shots = ex.screenshots || [];
+      $("exPreview").innerHTML = shots.length
+        ? shots.map(src=>`<img src="${escapeHTML(src)}" alt="preview">`).join("")
+        : `<div class="empty">Keine Screenshots hinterlegt.</div>`;
+
+      $("exBack").setAttribute("data-open","1");
+      $("exBack").setAttribute("aria-hidden","false");
+    }
+    function closeExercise(){
+      $("exBack").setAttribute("data-open","0");
+      $("exBack").setAttribute("aria-hidden","true");
+      currentExercise = null;
+    }
+
+    $("exClose").addEventListener("click", closeExercise);
+    $("exBack").addEventListener("click",(e)=>{ if(e.target===$("exBack")) closeExercise(); });
+
+    $("exFavBtn").addEventListener("click", ()=>{
+      if(!currentExercise) return;
+      toggleFav(currentExercise.id);
+      $("exFavBtn").textContent = favorites.has(currentExercise.id) ? "★ Favorit" : "☆ Favorit";
+      render();
+    });
+
+    $("exOpenShots").addEventListener("click", ()=>{
+      if(!currentExercise) return;
+      (currentExercise.screenshots||[]).forEach(src=>window.open(src,"_blank","noopener,noreferrer"));
+    });
+
+    $("exSaveNotes").addEventListener("click", ()=>{
+      if(!currentExercise) return;
+      notesById[currentExercise.id] = $("exNotes").value || "";
+      saveJSON(LS.notes, notesById);
+      alert("Notizen gespeichert ✅");
+    });
+
+    $("exEditCat").addEventListener("click", ()=>{
+      if(!currentExercise) return;
+      const cur = currentExercise.category;
+      const pick = prompt(
+        "Neue Kategorie (genau so schreiben):\n\n" + CATEGORIES.join("\n") + "\n\nAktuell: " + cur,
+        cur
+      );
+      if(!pick) return;
+      const p = pick.trim();
+      if(!CATEGORIES.includes(p)){
+        $("exErr").textContent = "Kategorie ungültig. Bitte exakt eine der Kategorien eingeben.";
+        $("exErr").style.display="block";
+        return;
+      }
+      catOverrides[currentExercise.id] = p;
+      saveJSON(LS.catOverrides, catOverrides);
+      currentExercise.category = p;
+      $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(p)}</span>
+        <span class="pill">🖼 ${(currentExercise.screenshots||[]).length} Bilder</span>`;
+      $("exErr").style.display="none";
+      // resort
+      EXERCISES.sort((a,b)=>{
+        const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+        const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+        return c !== 0 ? c : a.title.localeCompare(b.title);
+      });
+      render();
+    });
+
+    /* =========================
+       Add to Training
+       ========================= */
+    let addExercise = null;
+
+    $("exAddBtn").addEventListener("click", ()=>{
+      if(!currentExercise) return;
+      addExercise = currentExercise;
+      $("addMeta").innerHTML = `<span class="pill">➕ ${escapeHTML(addExercise.title)}</span>`;
+      renderAddList();
+      $("addBack").setAttribute("data-open","1");
+      $("addBack").setAttribute("aria-hidden","false");
+    });
+
+    function closeAdd(){
+      $("addBack").setAttribute("data-open","0");
+      $("addBack").setAttribute("aria-hidden","true");
+      addExercise = null;
+    }
+
+    $("addClose").addEventListener("click", closeAdd);
+    $("addBack").addEventListener("click",(e)=>{ if(e.target===$("addBack")) closeAdd(); });
+
+    function renderAddList(){
+      const el = $("addList");
+      if(!trainings.length){
+        el.innerHTML = `<div class="empty">Noch kein Training. Tippe „+ Neues Training“.</div>`;
+        return;
+      }
+      const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      el.innerHTML = sorted.map(tr=>{
+        return `<div class="card" data-tr="${escapeHTML(tr.id)}">
+          <div class="thumb"><div class="ph">TR</div></div>
+          <div class="meta">
+            <p class="t">${escapeHTML(tr.name)}</p>
+            <div class="s"><span class="pill">🧩 ${(tr.items||[]).length} Übungen</span></div>
+          </div>
+          <button class="iconbtn">＋</button>
+        </div>`;
+      }).join("");
+
+      el.querySelectorAll(".card").forEach(card=>{
+        const trId = card.getAttribute("data-tr");
+        const addIt = ()=>{
+          addExerciseToTraining(trId, addExercise.id);
+          alert("Hinzugefügt ✅");
+          renderAddList();
+          render();
+        };
+        card.addEventListener("click", addIt);
+        card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); addIt(); });
+      });
+    }
+
+    $("addCreate").addEventListener("click", ()=>{
+      const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
+      if(!name) return;
+      const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+      trainings = [tr, ...trainings];
+      saveJSON(LS.trainings, trainings);
+      renderAddList();
+      render();
+    });
+
+    function addExerciseToTraining(trainingId, exerciseId){
+      const idx = trainings.findIndex(t=>t.id===trainingId);
+      if(idx<0) return;
+      const tr = trainings[idx];
+      tr.items = tr.items || [];
+      tr.items.push({ exerciseId, addedAt: Date.now() });
+      tr.updatedAt = Date.now();
+      trainings[idx]=tr;
+      saveJSON(LS.trainings, trainings);
+    }
+
+    /* =========================
+       Training CRUD + Editor
+       ========================= */
+    $("btnNewTraining").addEventListener("click", ()=>{
+      const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
+      if(!name) return;
+      const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+      trainings = [tr, ...trainings];
+      saveJSON(LS.trainings, trainings);
+      setTab("trainings");
+    });
+
+    let currentTrainingId = null;
+
+    function openTraining(id){
+      const tr = trainings.find(t=>t.id===id);
+      if(!tr) return;
+      currentTrainingId = id;
+      $("trTitle").textContent = tr.name;
+      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+      renderTrainingList();
+      $("trBack").setAttribute("data-open","1");
+      $("trBack").setAttribute("aria-hidden","false");
+    }
+
+    function closeTraining(){
+      $("trBack").setAttribute("data-open","0");
+      $("trBack").setAttribute("aria-hidden","true");
+      currentTrainingId = null;
+    }
+
+    $("trClose").addEventListener("click", closeTraining);
+    $("trBack").addEventListener("click",(e)=>{ if(e.target===$("trBack")) closeTraining(); });
+
+    function renderTrainingList(){
+      const tr = trainings.find(t=>t.id===currentTrainingId);
+      if(!tr) return;
+      const items = tr.items || [];
+      const list = $("trList");
+      const empty = $("trEmpty");
+      if(!items.length){
+        empty.style.display="block";
+        list.innerHTML="";
+        return;
+      }
+      empty.style.display="none";
+
+      list.innerHTML = items.map((it, idx)=>{
+        const ex = EXERCISES.find(e=>e.id===it.exerciseId);
+        const title = ex ? ex.title : ("Unbekannt: " + it.exerciseId);
+        const cat = ex ? ex.category : "—";
+        const sc = ex?.screenshots?.length || 0;
+        const thumb = ex?.screenshots?.[0] || "";
+        return `<div class="card" data-idx="${idx}">
+          <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="p">` : `<div class="ph">—</div>`}</div>
+          <div class="meta">
+            <p class="t">${escapeHTML(title)}</p>
+            <div class="s">
+              <span class="pill">🏷 ${escapeHTML(cat)}</span>
+              <span class="pill">🖼 ${sc}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex:0 0 auto">
+            <button class="iconbtn" data-act="up">▲</button>
+            <button class="iconbtn" data-act="down">▼</button>
+            <button class="iconbtn" data-act="rm">✕</button>
+          </div>
+        </div>`;
+      }).join("");
+
+      list.querySelectorAll(".card").forEach(card=>{
+        const idx = Number(card.getAttribute("data-idx"));
+        card.querySelectorAll(".iconbtn").forEach(b=>{
+          b.addEventListener("click",(e)=>{
+            e.stopPropagation();
+            trainingAction(b.getAttribute("data-act"), idx);
+          });
+        });
+        card.addEventListener("click", ()=>{
+          const t = trainings.find(x=>x.id===currentTrainingId);
+          const exId = (t.items||[])[idx]?.exerciseId;
+          if(exId) openExercise(exId);
+        });
+      });
+    }
+
+    function trainingAction(act, idx){
+      const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+      if(tIdx<0) return;
+      const tr = trainings[tIdx];
+      tr.items = tr.items || [];
+      if(act==="rm") tr.items.splice(idx,1);
+      if(act==="up" && idx>0){ const tmp=tr.items[idx-1]; tr.items[idx-1]=tr.items[idx]; tr.items[idx]=tmp; }
+      if(act==="down" && idx<tr.items.length-1){ const tmp=tr.items[idx+1]; tr.items[idx+1]=tr.items[idx]; tr.items[idx]=tmp; }
+      tr.updatedAt = Date.now();
+      trainings[tIdx]=tr;
+      saveJSON(LS.trainings, trainings);
+      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+      renderTrainingList();
+      render();
+    }
+
+    $("trRename").addEventListener("click", ()=>{
+      const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+      if(tIdx<0) return;
+      const tr = trainings[tIdx];
+      const name = prompt("Neuer Name:", tr.name);
+      if(!name) return;
+      tr.name = name.trim();
+      tr.updatedAt = Date.now();
+      trainings[tIdx]=tr;
+      saveJSON(LS.trainings, trainings);
+      $("trTitle").textContent = tr.name;
+      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+      render();
+    });
+
+    $("trDuplicate").addEventListener("click", ()=>{
+      const tr = trainings.find(t=>t.id===currentTrainingId);
+      if(!tr) return;
+      const copy = {
+        id: nowId(),
+        name: tr.name + " (Kopie)",
+        items: (tr.items||[]).map(x=>({ ...x })),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      trainings = [copy, ...trainings];
+      saveJSON(LS.trainings, trainings);
+      alert("Dupliziert ✅");
+      openTraining(copy.id);
+      render();
+    });
+
+    $("trDelete").addEventListener("click", ()=>{
+      const tr = trainings.find(t=>t.id===currentTrainingId);
+      if(!tr) return;
+      if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
+      trainings = trainings.filter(t=>t.id!==currentTrainingId);
+      saveJSON(LS.trainings, trainings);
+      closeTraining();
+      render();
+    });
+
+    /* =========================
+       PDF Export (jsPDF)
+       ========================= */
+    async function ensureJsPdf(){
+      if(window.jspdf && window.jspdf.jsPDF) return;
+
+      // CDN first
+      await new Promise((resolve)=>{
+        const s=document.createElement("script");
+        s.src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+        s.onload=resolve; s.onerror=resolve;
+        document.head.appendChild(s);
+      });
+      if(window.jspdf && window.jspdf.jsPDF) return;
+
+      // local fallback: assets/libs/jspdf.umd.min.js
+      await new Promise((resolve)=>{
+        const s=document.createElement("script");
+        s.src="assets/libs/jspdf.umd.min.js";
+        s.onload=resolve; s.onerror=resolve;
+        document.head.appendChild(s);
+      });
+      if(!(window.jspdf && window.jspdf.jsPDF)){
+        throw new Error("jsPDF konnte nicht geladen werden. (Kein Internet + keine assets/libs/jspdf.umd.min.js)");
+      }
+    }
+
+    async function fetchAsDataUrl(url){
+      const res = await fetch(url, { cache:"no-cache" });
+      if(!res.ok) throw new Error("Fehlendes Bild: " + url);
+      const blob = await res.blob();
+      return await new Promise((resolve,reject)=>{
+        const r = new FileReader();
+        r.onload = ()=>resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(blob);
+      });
+    }
+
+    $("trExportPdf").addEventListener("click", async ()=>{
+      const tr = trainings.find(t=>t.id===currentTrainingId);
+      if(!tr) return;
+
+      try{ await ensureJsPdf(); }catch(e){ alert("PDF Export nicht möglich: " + e.message); return; }
+      const { jsPDF } = window.jspdf;
+
+      const doc = new jsPDF({ unit:"mm", format:"a4", compress:true });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 12;
+      const maxW = pageW - margin*2;
+
+      let y = margin;
+
+      doc.setFont("helvetica","bold");
+      doc.setFontSize(18);
+      doc.text(tr.name, margin, y);
+      y += 8;
+
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(11);
+      doc.text("Exportiert: " + new Date().toLocaleString(), margin, y);
+      y += 10;
+
+      const items = tr.items || [];
+
+      for(let i=0;i<items.length;i++){
+        const ex = EXERCISES.find(e=>e.id===items[i].exerciseId);
+        if(!ex) continue;
+
+        // section title
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(14);
+        const heading = `${i+1}. ${ex.title}  (${ex.category})`;
+        const headLines = doc.splitTextToSize(heading, maxW);
+        if(y + headLines.length*6 > pageH - margin){ doc.addPage(); y = margin; }
+        doc.text(headLines, margin, y);
+        y += headLines.length*6 + 2;
+
+        // notes
+        const note = (notesById[ex.id] || "").trim();
+        if(note){
+          doc.setFont("helvetica","normal");
+          doc.setFontSize(11);
+          const nLines = doc.splitTextToSize("Notizen: " + note, maxW);
+          if(y + nLines.length*5 > pageH - margin){ doc.addPage(); y = margin; }
+          doc.text(nLines, margin, y);
+          y += nLines.length*5 + 3;
+        }
+
+        // screenshots
+        const shots = (ex.screenshots||[]).slice();
+        shots.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
+
+        for(const shotUrl of shots){
+          let dataUrl;
+          try{
+            dataUrl = await fetchAsDataUrl(shotUrl);
+          }catch(err){
+            doc.setTextColor(200, 60, 80);
+            const t = doc.splitTextToSize("Bild fehlt: " + shotUrl, maxW);
+            if(y + t.length*5 > pageH - margin){ doc.addPage(); y = margin; }
+            doc.text(t, margin, y);
+            doc.setTextColor(0,0,0);
+            y += t.length*5 + 4;
+            continue;
+          }
+
+          const dims = await new Promise((resolve)=>{
+            const img = new Image();
+            img.onload = ()=>resolve({ w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = ()=>resolve({ w: 1200, h: 800 });
+            img.src = dataUrl;
+          });
+
+          const ratio = dims.h / dims.w;
+          const drawH = maxW * ratio;
+
+          if(y + drawH > pageH - margin){
+            doc.addPage();
+            y = margin;
+          }
+
+          const imgType = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+          doc.addImage(dataUrl, imgType, margin, y, maxW, drawH, undefined, "FAST");
+          y += drawH + 6;
+        }
+
+        // separator line
+        if(i < items.length - 1){
+          if(y + 6 > pageH - margin){ doc.addPage(); y = margin; }
+          doc.setDrawColor(210,210,210);
+          doc.line(margin, y, pageW - margin, y);
+          y += 8;
+        }
+      }
+
+      const safe = (tr.name || "Training").replace(/[\/\\?%*:|"<>]/g,"-").trim();
+      doc.save(safe + ".pdf");
+    });
+
+    /* =========================
+       Data export (also helps you create manifest.json for GitHub Pages)
+       ========================= */
+    $("btnExportData").addEventListener("click", ()=>{
+      const manifest = { files: EXERCISES.flatMap(e => e.screenshots.map(s => s.replace(/^assets\/previews\//,""))) };
+      const payload = {
+        exportedAt: Date.now(),
+        info: "Lege manifest.json in assets/previews/ ab, damit GitHub Pages alle Bilder findet.",
+        manifest_json_to_save_as: "assets/previews/manifest.json",
+        manifest,
+        state: {
+          selectedCats,
+          favorites: Array.from(favorites),
+          notesById,
+          trainings,
+          catOverrides
+        }
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type:"application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "coach-app-data-and-manifest.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      alert("Export erstellt ✅\n\nTipp: Öffne die JSON und kopiere den 'manifest' Block als assets/previews/manifest.json für GitHub Pages.");
+    });
+
+    $("btnReset").addEventListener("click", ()=>{
+      if(!confirm("Wirklich alles zurücksetzen? (Favoriten, Trainings, Notizen)")) return;
+      localStorage.removeItem(LS.tab);
+      localStorage.removeItem(LS.cats);
+      localStorage.removeItem(LS.fav);
+      localStorage.removeItem(LS.notes);
+      localStorage.removeItem(LS.trainings);
+      localStorage.removeItem(LS.catOverrides);
+      localStorage.removeItem(LS.manifestCache);
+      location.reload();
+    });
+
+    /* =========================
+       Tabs, Search, Shortcuts
+       ========================= */
+    $("tabExercises").addEventListener("click", ()=>setTab("exercises"));
+    $("tabTrainings").addEventListener("click", ()=>setTab("trainings"));
+    $("tabFavs").addEventListener("click", ()=>setTab("favs"));
+
+    let sd=null;
+    searchEl.addEventListener("input", ()=>{ clearTimeout(sd); sd=setTimeout(render, 120); });
+
+    document.addEventListener("keydown",(e)=>{
+      if(e.key==="Escape"){
+        closeExercise();
+        closeAdd();
+        closeTraining();
+      }
+    });
+
+    /* =========================
+       Boot
+       ========================= */
+    (async function boot(){
+      // persist current state (in case first run)
+      saveJSON(LS.tab, activeTab);
+      saveJSON(LS.cats, selectedCats);
+      saveJSON(LS.fav, Array.from(favorites));
+      saveJSON(LS.notes, notesById);
+      saveJSON(LS.trainings, trainings);
+      saveJSON(LS.catOverrides, catOverrides);
+
+      await loadAllExercises();
+
+      // gentle warning if some filenames still contain uppercase/spaces (will still work locally but better normalized)
+      const bad = EXERCISES.flatMap(e=>e.screenshots.map(s=>s.replace(/^assets\/previews\//,"")))
+        .filter(f=>/[A-Z ]/.test(f));
+      if(bad.length){
+        $("hintBox").innerHTML = `<b>Hinweis:</b> Einige Dateinamen enthalten noch Großbuchstaben/Leerzeichen. Lokal geht das oft, online kann es Probleme machen.<br>
+        Beispiel: <code>${escapeHTML(bad[0])}</code>`;
+      }
+
+      renderChips();
+      setTab(activeTab);
+    })();
+  </script>
+</body>
+</html>
