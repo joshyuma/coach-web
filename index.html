@@ -576,6 +576,15 @@
 
   <script>
     "use strict";
+    function applyCategoryOverrides(){
+  if(!Array.isArray(EXERCISES)) return;
+
+  for(const ex of EXERCISES){
+    if(!ex || !ex.id) continue;
+    const ov = catOverrides[ex.id];
+    if(ov) ex.category = ov;
+  }
+}
 // =========================
 // OCR ADDON
 // =========================
@@ -1920,8 +1929,17 @@ return "unsorted";
       saveJSON(LS.notes, notesById);
       saveJSON(LS.trainings, trainings);
       saveJSON(LS.catOverrides, catOverrides);
+      
+      try{
+  const r = await fetch("assets/catOverrides.json", { cache:"no-store" });
+  if(r.ok){
+    catOverrides = await r.json();
+    saveJSON(LS.catOverrides, catOverrides); // optional, schreibt es auch in localStorage
+  }
+}catch(e){}
 
       await loadAllExercises();
+      applyCategoryOverrides();
 
       // gentle warning if some filenames still contain uppercase/spaces (will still work locally but better normalized)
       const bad = EXERCISES.flatMap(e=>e.screenshots.map(s=>s.replace(/^assets\/previews\//,"")))
