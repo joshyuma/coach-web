@@ -1131,7 +1131,7 @@ return "unsorted";
        Loader: manifest.json first, fallback parse directory listing (works on Python server)
        ========================= */
     async function loadManifestJson(){
-      const res = await fetch("assets/previews/manifest.json", { cache: "no-cache" });
+      const res = await fetch("assets/manifest.json", { cache: "no-cache" });
       if(!res.ok) throw new Error("manifest.json nicht gefunden");
       const data = await res.json();
       if(!data || !Array.isArray(data.files)) throw new Error("manifest.json Format falsch");
