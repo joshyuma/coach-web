@@ -425,6 +425,7 @@
     }
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
+  <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 
 <body>
@@ -440,6 +441,7 @@
         </div>
         <div class="hActions">
           <button class="btn" id="btnExportData">Daten</button>
+          <button class="btn" id="btnOcr">OCR</button>
           <button class="btn danger" id="btnReset">Reset</button>
         </div>
       </div>
@@ -450,7 +452,7 @@
         <div class="panelHead">
           <div>
             <h2 id="leftTitle">Suche & Filter</h2>
-            <p id="leftSub">Tippe z.B. „closeout“, „dominoes“, „touch action“</p>
+            <p id="leftSub">Treffer: <span id="hitCount">0</span></p>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <button class="btn primary" id="btnNewTraining">+ Training</button>
@@ -462,11 +464,7 @@
             <input id="search" type="text" placeholder="Suche (Name, 1-on-1, 3-on-3, ...)" autocomplete="off" />
           </div>
           <div class="chips" id="chips"></div>
-          <div class="note" id="hintBox">
-            <b>Wichtig:</b> Damit die App deine vielen PNGs automatisch findet:
-            <br>• Lokal (Python Server) funktioniert es meist auch ohne extra Datei.
-            <br>• Für GitHub Pages brauchst du <code>assets/previews/manifest.json</code> (siehe unten im Daten-Export).
-          </div>
+        
         </div>
       </section>
 
@@ -507,7 +505,7 @@
         <div class="mRow">
           <button class="btn" id="exFavBtn">☆ Favorit</button>
           <button class="btn primary" id="exAddBtn">＋ Zu Training</button>
-            <button class="btn ghost" id="exOpenShots">🖼️ Bilder öffnen</button>
+          <button class="btn ghost" id="exOpenShots">🖼️ Bilder öffnen</button>
         </div>
 
         <div class="split">
@@ -578,7 +576,62 @@
 
   <script>
     "use strict";
+// =========================
+// OCR ADDON
+// =========================
 
+const OCR = {
+  enabled: true,
+  lang: "eng",
+  cachePrefix: "coach_ocr_v2:",
+  concurrency: 2,
+};
+
+function ocrKey(url){ return OCR.cachePrefix + url; }
+
+function ocrGet(url){
+  try{ return localStorage.getItem(ocrKey(url)); }catch(e){ return null; }
+}
+
+function ocrSet(url, txt){
+  try{ localStorage.setItem(ocrKey(url), txt); }catch(e){}
+}
+
+async function ocrImage(url){
+  const cached = ocrGet(url);
+  if(cached !== null) return cached;
+
+  const r = await Tesseract.recognize(url, OCR.lang);
+
+  let text = (r?.data?.text || "")
+    .replace(/[’‘]/g,"'")
+    .replace(/\s+/g," ")
+    .replace(/[^\x20-\x7E]/g," ")
+    .toLowerCase();
+
+  ocrSet(url, text);
+  return text;
+}
+
+async function buildOcrIndex(exercises){
+  let i = 0;
+
+  async function worker(){
+    while(i < exercises.length){
+      const ex = exercises[i++];
+      const img = ex?.screenshots?.[0];
+      if(!img){ ex.ocrText=""; continue; }
+
+      try{
+        ex.ocrText = await ocrImage(img);
+      }catch{
+        ex.ocrText = "";
+      }
+    }
+  }
+
+  await Promise.all([worker(),worker()]);
+}
     /* =========================
        Kategorien nach Inhaltsverzeichnis
        ========================= */
@@ -600,71 +653,379 @@
       "WARM-UPS & ENERGIZERS"
     ];
 
-    // Heuristik-Regeln (du kannst später Kategorien manuell pro Übung ändern – wird gespeichert)
-    function guessCategoryFromName(filename){
-      const f = filename.toLowerCase();
+    /* =========================
+   Inhaltsverzeichnis-Zuordnung (Titel → Kategorie)
+   Diese Liste ist die Wahrheit. Damit ist "Passing" korrekt,
+   auch wenn das Wort "passing" NICHT im Dateinamen steht.
+   ========================= */
 
-      // Warmups/Energizers (aus Contents)
-      const warm = ["bing-bang-bong","capture-the-flag","circle-tag","circle-touch","cone-reaction",
-                    "pylon-exchanges","rock-paper-scissors","sheep-and-wolf-tag","stance-games","stack-start",
-                    "surprise-game","team-scoring-system","tennis-ball","tic-tac-toe","red-light-green-light",
-                    "pac-man-tag","hunter-tag","line-tag","mirror-dribbling","push-out-races","four-spots",
-                    "pass-tag","take-two-passing","animals-game","breakout-and-baseball","fortnite","cambio-game",
-                    "battleship","attack-the-mouse-turtle","ppp-scoring","scrambletouchgame","pylon-dribbles"];
-      if(warm.some(k => f.includes(k))) return "WARM-UPS & ENERGIZERS";
+const CATEGORY_TITLES = {
+  "FINISHING": [
+    "1-on-1 Around the Arc",
+    "1-on-1 Blind Start",
+    "1-on-1 Block",
+    "1-on-1 Bump Tap",
+    "1-on-1 Cat and Mouse",
+    "1-on-1 Chase Down",
+    "1-on-1 Continuous Posters",
+    "1-on-1 Corner Finishes",
+    "1-on-1 Double Contest",
+    "1-on-1 Elbow Touches",
+    "1-on-1 Five Spots",
+    "1-on-1 Guided Series",
+    "1-on-1 Guided vs Primary DEF",
+    "1-on-1 High-5",
+    "1-on-1 Loop",
+    "1-on-1 Multi-Primary and Stunt",
+    "1-on-1 Octopus",
+    "1-on-1 Paint Escape",
+    "1-on-1 Shadow",
+    "1-on-1 Sideline Angle",
+    "1-on-1 Smile",
+    "1-on-1 Surprise Handoff",
+    "1-on-1 Trail",
+    "1-on-1 Transition Finishes",
+    "1-on-1 Wing Finishes",
+    "1-on-1 Wing Touchdown",
+    "1-on-1 X-Out",
+    "1-on-1 +1 Blind Cut",
+    "1-on-2 Chaos",
+    "1-on-2 Guided vs Primary and Help Defense",
+    "1-on-2 Guided vs Primary and Stunt DEF",
+    "1-on-3 Guided vs All",
+    "1-on-1 Perceptual Finishes"
+  ],
 
-      // Dominoes
-      if(f.includes("dominoes") || f.includes("domino")) return "DOMINOES REACTIONS";
+  "CLOSEOUTS": [
+    "1-on-1 Blast Pick-Up",
+    "1-on-1 Blasts Conegate",
+    "1-on-1 Bounce Closeouts",
+    "1-on-1 Guided Catch Footwork",
+    "1-on-1 Cone Blasts",
+    "1-on-1 Cone Touch",
+    "1-on-1 Multi Skip and Closeout",
+    "1-on-1 Sprint Ins",
+    "1-on-1 Sprint Pick-Up",
+    "1-on-1 +1 Blast Cuts",
+    "1-on-1 +1 Blind Closeout",
+    "1-on-1 +1 Burst Closeouts",
+    "1-on-1 +1 Corner Closeouts",
+    "1-on-1 +1 Skip and High Five"
+  ],
 
-      // Transition
-      const trans = ["outlet","transition","wheel-start","train-transition","skip-or-push","continuous-hc","x-out","leak-out"];
-      if(trans.some(k => f.includes(k))) return "TRANSITION";
+  "SHOOTING": [
+    "1-on-1 Catch Me If You Can",
+    "1-on-1 Drift and Lift",
+    "1-on-1 Exit Footwork",
+    "1-on-1 Figure of 8’s",
+    "1-on-1 Push-Off Shooting",
+    "Cone Tag",
+    "Move the Cones"
+  ],
 
-      // Triggers
-      const trig = ["cross-screen","touch-action","scram-switch","swing-to-random-pnr"];
-      if(trig.some(k => f.includes(k))) return "TRIGGERS";
+  "DRIBBLING": [
+    "1-on-1 Change of Speed",
+    "1-on-1 Dribble Combos into Finish",
+    "1-on-1 Grid",
+    "1-on-1 Grid Attack",
+    "1-on-1 Guided Hip Turn",
+    "1-on-1 Guided Skates",
+    "1-on-1 Hip Turn",
+    "1-on-1 Hostage",
+    "1-on-1 Routed",
+    "1-on-1 Skate and Push",
+    "1-on-1 Spanish Dribbles",
+    "1-on-1 Straight Line or Counter",
+    "1-on-1 Sumo",
+    "1-on-1 Through the Gate",
+    "1-on-2 HC Hit",
+    "1-on-2 Touchdown",
+    "1-on-3 Gladiator",
+    "Line Tag",
+    "Mirror Dribbling",
+    "Pac-Man Tag",
+    "Push Out Races",
+    "Pylon Dribbles",
+    "Red Light Green Light",
+    "Team Knockout",
+    "Team Tag"
+  ],
 
-      // Pick & Roll
-      const pnr = ["pick","coverage","australia","gentleman-stance","twist-vs-under","smash-or-slip","gets","lateral-stack","stack-pnr","hi-lo-vs-switch","what-weapon-vs-switch"];
-      if(pnr.some(k => f.includes(k))) return "PICK AND ROLL";
+  "DEFENSE": [
+    "1-on-1 Seven Seconds",
+    "1-on-1 Chest Blows",
+    "1-on-1 Close the Gate",
+    "1-on-1 Lane Turns",
+    "1-on-1 Mirror Game",
+    "1-on-1 Open and Chase",
+    "1-on-1 Protect the Paint",
+    "1-on-1 Surprise",
+    "4-on-4 Prison Break"
+  ],
 
-      // Rebounding
-      if(f.includes("rebound")) return "REBOUNDING";
+  "PASSING": [
+    "1-on-1 Ping-Pong",
+    "1-on-1 Basketball Tennis",
+    "1-on-1 +1 Grid Passing",
+    "1-on-1 +1 Make a Lead",
+    "2-on-0 Rapid Fire Competition",
+    "2-on-1 Three in a Row",
+    "2-on-1 Pivot Surprise",
+    "2-on-2 Bowling Strikes",
+    "3-on-1 Passing",
+    "3-on-3 Touchdown",
+    "4-on-2 Rondo",
+    "4-on-4 Keep Away",
+    "Basketball Handball",
+    "Four-Sports",
+    "Hunter Tag",
+    "Pass Tag",
+    "Take-Two Passing"
+  ],
 
-      // Post
-      if(f.includes("post") || f.includes("deep-hooks") || f.includes("deep-seals") || f.includes("t-post")) return "POST";
+  "POST": [
+    "1-on-1 Quick Ups",
+    "1-on-1 +1 Deep Hooks",
+    "1-on-1 +1 Deep Seals",
+    "2-on-2 Continuous",
+    "3-on-3 T-Post Decisions",
+    "4-on-4 Career into T-Post",
+    "4-on-4 Post Reactions",
+    "5-on-5 Post Surprise"
+  ],
 
-      // Passing
-      const pass = ["passing","ping-pong","tennis","grid-passing","make-a-lead"];
-      if(pass.some(k => f.includes(k))) return "PASSING";
+  "REBOUNDING": [
+    "1-on-1 Shuffle Rebounds",
+    "1-on-1 +1 Hot Potato",
+    "1-on-1 +1 Weak Side Rebounding"
+  ],
 
-      // Shooting
-      if(f.includes("shooting") || f.includes("quick-ups") || f.includes("push-off")) return "SHOOTING";
+  "PLAYER DEV MIX ACTIVITIES": [
+    "1-on-1 Aces",
+    "1-on-1 Exit Passes",
+    "1-on-1 Gap Positioning",
+    "1-on-1 Pick-Up",
+    "1-on-1 Retreat",
+    "1-on-1 Two-Ball",
+    "1-on-1 +1 Get Flashes",
+    "1-on-1 +1 Trail and Cut",
+    "1-on-1 +2 Get Open",
+    "1-on-2 Find Space",
+    "2-on-1 Smash or Slip",
+    "2-on-1 Twist Versus Under",
+    "2-on-2 Gets"
+  ],
 
-      // Dribbling
-      const drib = ["dribble","dribbling","change-of-speed","grid","hip-turn","guided-skates","guided-hip-turn","spanish-dribbles","straight-line-or-counter","sumo","through-the-gate"];
-      if(drib.some(k => f.includes(k))) return "DRIBBLING";
+  "PICK AND ROLL": [
+    "1-on-1 Avoid the Pick",
+    "1-on-1 +1 Cancel the Pick",
+    "2-on-2 Australia",
+    "2-on-2 Call the Coverage",
+    "2-on-2 Gentleman’s Stance",
+    "3-on-3 High-Low Versus Switch",
+    "3-on-3 Stack Pick and Roll",
+    "3-on-3 What Weapon Versus Switch",
+    "4-on-4 Scram Switch",
+    "4-on-4 Swing to Random PNR"
+  ],
 
-      // Defense
-      const def = ["seven-seconds","chest-blows","close-the-gate","lane-turns","protect-the-paint","open-and-chase","mirror-game","shadow","sideline-angle"];
-      if(def.some(k => f.includes(k))) return "DEFENSE";
+  "TRIGGERS": [
+    "3-on-3 Cross Screen",
+    "3-on-3 Touch Action",
+    "4-on-4 Cross Screen Down Screen"
+  ],
 
-      // Closeouts
-      const close = ["close-out","closeout","cone-blasts","cone-touch","multi-skip-and-close-out","sprint-ins","sprint-pick-up","blast-pick-up","blasts-cone-gate","bounce-close-outs","guided-catch-footwork"];
-      if(close.some(k => f.includes(k))) return "CLOSEOUTS";
+  "TRANSITION": [
+    "1-on-1 +1 Leak Out",
+    "2-on-1 Continuous HC",
+    "2-on-1 Skip or Push",
+    "2-on-2 Two Side X-Out",
+    "2-on-3 Outlet",
+    "3-on-3 Rugby",
+    "4-on-3 Two Side",
+    "4-on-4 Line Touch",
+    "5-on-5 Train Transition",
+    "5-on-5 Wheelchair",
+    "Animals Game",
+    "Breakout and Baseball",
+    "Circle Touch",
+    "Spacing Races"
+  ],
 
-      // Finishing (Fallback für viele 1-on-1 Basics)
-      const fin = ["finishes","finish","around-the-arc","blind-start","block","bump-tap","cat-and-mouse","chasedown","continuous-posters","corner-finishes",
-                   "double-contest","elbow-touches","five-spots","guided-series","guided-vs-primary-def","hi-5","loop","multi-primary-and-stunt",
-                   "octopus","paint-escape","surprise-hand-off","trail","wing-finishes","wing-touchdown","perceptual-finishes","find-a-space"];
-      if(fin.some(k => f.includes(k))) return "FINISHING";
+  "DOMINOES REACTIONS": [
+    "1-on-1 Multi Out to Space",
+    "1-on-1 +1 Second Cuts",
+    "2-on-1 Shooting",
+    "2-on-1 Two-Side Skip",
+    "2-on-1 +1 Shooting",
+    "2-on-2 Lateral Stack",
+    "2-on-2 Post-Pen Reaction",
+    "2-on-2 Wave",
+    "2-on-2 Wheel Skip",
+    "3-on-2 Bursts",
+    "3-on-2 Zero Seconds",
+    "3-on-3 Coach Tag",
+    "3-on-3 Criss-Cross",
+    "3-on-3 Two-Side Coach Tag",
+    "4-on-3 Bursts",
+    "4-on-4 Coach Touch",
+    "4-on-4 Dominoes"
+  ],
 
-      // Team / Player Dev Mix (hier schwer zu erkennen → Default TEAM)
-      const team = ["4-on-5","5-on-5","6-on-5","3-on-3","4-on-4","2-on-2","2-on-3","2-on-0","1-on-2","1-on-3","2-on-1","2-on-1-plus-1","1-on-1-plus-1","1-on-1-plus-2"];
-      if(team.some(k => f.includes(k))) return "TEAM DEV MIX ACTIVITIES";
+  "TEAM DEV MIX ACTIVITIES": [
+    "2-on-2 Neutral or Advantage",
+    "3-on-3 3 Stages",
+    "4-on-5 Attack",
+    "5-on-5 on 5 Charger",
+    "6-on-5 Zone",
+    "Attack the Mouse / Turtle",
+    "Battleship",
+    "Cambio Game",
+    "Fortnite",
+    "PPP Scoring",
+    "Scramble Touch Game",
+    "Stack Start",
+    "Surprise Game",
+    "Team Scoring System",
+    "Floor is Lava Constraint"
+  ],
 
-      return "PLAYER DEV MIX ACTIVITIES";
+  "WARM-UPS & ENERGIZERS": [
+    "Bing Bang Bong",
+    "Capture the Flag",
+    "Circle Tag",
+    "Cone Reaction",
+    "Pylon Exchanges",
+    "Rock Paper Scissors",
+    "Sheep and Wolf Tag",
+    "Stance Games",
+    "Tennis Ball Catches",
+    "Tennis Ball Drops",
+    "Tic Tac Toe Relay"
+  ]
+};
+
+// Normalisiert Titel (damit kleine Schreibfehler/Bindestriche nicht alles killen)
+function keyFromTitle(s){
+  return (s||"")
+    .toLowerCase()
+    .replaceAll("’","'")        // typographisches Apostroph
+    .replace(/[^a-z0-9]+/g," ") // alles zu Wörtern
+    .trim()
+    .replace(/\s+/g," ");
+}
+
+// Map: normalisierter Titel -> Kategorie
+const TITLE_TO_CATEGORY = (() => {
+  const m = Object.create(null);
+  for(const [cat, titles] of Object.entries(CATEGORY_TITLES)){
+    for(const t of titles){
+      m[keyFromTitle(t)] = cat;
     }
+  }
+  return m;
+})();
+
+function categoryFromContentsTitle(exTitle){
+  return TITLE_TO_CATEGORY[keyFromTitle(exTitle)] || null;
+}
+
+   function guessCategoryFromName(filename){
+const f = filename.toLowerCase();
+
+// ================= WARM UPS =================
+if([
+"bing","capture","circle","cone-reaction","pylon-exchanges","rock-paper","sheep","stance",
+"tennis-ball","tic-tac","red-light","pac-man","hunter","line-tag","mirror","push-out",
+"four-spots","take-two","animals","breakout","fortnite","battleship","ppp","scramble",
+"stack-start","surprise","team-scoring"
+].some(k=>f.includes(k))) return "WARM-UPS & ENERGIZERS";
+
+// ================= FINISHING =================
+if([
+"around-the-arc","blind-start","block","bump-tap","cat-and-mouse","chasedown",
+"continuous-posters","corner-finishes","double-contest","elbow-touches","five-spots",
+"guided-series","guided-vs-primary","hi-5","loop","multi-primary","octopus","paint-escape",
+"shadow","sideline","smile","surprise-handoff","trail","wing-finishes","wing-touchdown",
+"x-out","plus-1","plus-2","chaos","perceptual"
+].some(k=>f.includes(k))) return "FINISHING";
+
+// ================= CLOSEOUTS =================
+if([
+"closeout","cone-blasts","cone-touch","blast","bounce","guided-catch","multi-skip",
+"sprint","pick-up","burst","corner","high-five"
+].some(k=>f.includes(k))) return "CLOSEOUTS";
+
+// ================= SHOOTING =================
+if([
+"figure","drift","exit-footwork","push-off","contact","move-the-cones","cone-tag","catch-me"
+].some(k=>f.includes(k))) return "SHOOTING";
+
+// ================= DRIBBLING =================
+if([
+"change-of-speed","dribble","grid","hip-turn","skates","hostage","routed","skate",
+"spanish","straight-line","sumo","gate","touchdown","gladiator","mirror-dribbling",
+"pac-man","pylon","team-tag","team-knockout"
+].some(k=>f.includes(k))) return "DRIBBLING";
+
+// ================= DEFENSE =================
+if([
+"seven-seconds","chest","close-the-gate","lane-turns","mirror-game","open-and-chase",
+"protect-the-paint","surprise","prison"
+].some(k=>f.includes(k))) return "DEFENSE";
+
+// ================= PASSING =================
+if([
+"ping","tennis","grid-passing","make-a-lead","rapid-fire","three-in-a-row","pivot",
+"bowling","rondo","keep-away","handball","four-sports","pass-tag"
+].some(k=>f.includes(k))) return "PASSING";
+
+// ================= POST =================
+if([
+"quick-ups","deep-hooks","deep-seals","continuous","t-post","career","post-reactions","post-surprise"
+].some(k=>f.includes(k))) return "POST";
+
+// ================= REBOUNDING =================
+if([
+"shuffle","hot-potato","weak-side"
+].some(k=>f.includes(k))) return "REBOUNDING";
+
+// ================= PLAYER DEV MIX =================
+if([
+"aces","exit-passes","gap-positioning","pick-up","retreat","two-ball","get-flashes",
+"trail-and-cut","get-open","find-space","smash-or-slip","twist","two-on-two-gets"
+].some(k=>f.includes(k))) return "PLAYER DEV MIX ACTIVITIES";
+
+// ================= PICK & ROLL =================
+if([
+"avoid","cancel","australia","coverage","gentleman","high-low","stack","weapon",
+"scram","random-pnr"
+].some(k=>f.includes(k))) return "PICK AND ROLL";
+
+// ================= TRIGGERS =================
+if([
+"cross-screen","touch-action","down-screen"
+].some(k=>f.includes(k))) return "TRIGGERS";
+
+// ================= TRANSITION =================
+if([
+"leak","continuous-hc","skip-or-push","x-out","outlet","rugby","line-touch",
+"train-transition","wheel","spacing"
+].some(k=>f.includes(k))) return "TRANSITION";
+
+// ================= DOMINOES =================
+if([
+"domino","post-pen","wheel-skip","zero-seconds","coach-tag","criss-cross","bursts"
+].some(k=>f.includes(k))) return "DOMINOES REACTIONS";
+
+// ================= TEAM DEV MIX =================
+if([
+"neutral","three-stages","attack","charger","zone","mouse","turtle","battleship",
+"cambio","ppp","scramble","stack-start","surprise","floor"
+].some(k=>f.includes(k))) return "TEAM DEV MIX ACTIVITIES";
+
+return "unsorted";
+}
 
     /* =========================
        Storage Keys
@@ -679,9 +1040,24 @@
       manifestCache: "coach_manifest_cache_final_v1"
     };
 
+ 
+
     /* =========================
        Helpers
        ========================= */
+      function setExerciseCategory(ex, newCat){
+  if(!newCat) return;
+
+  // exakt so schreiben, wie deine Kategorien heißen (Array CATEGORIES existiert bei dir)
+  if(!CATEGORIES.includes(newCat)){
+    alert("Unbekannte Kategorie: " + newCat);
+    return;
+  }
+
+  ex.category = newCat;               // sofort im UI sichtbar
+  catOverrides[ex.id] = newCat;       // dauerhaft speichern (auch wenn Button später weg ist)
+  saveJSON(LS.catOverrides, catOverrides);
+} 
     const $ = (id)=>document.getElementById(id);
     function loadJSON(key, fallback){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):fallback; }catch(e){ return fallback; } }
     function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
@@ -693,6 +1069,7 @@
         .replace(/[^a-z0-9]+/g," ")
         .trim();
     }
+    
     function tokenize(q){ const n=norm(q); return n? n.split(/\s+/).filter(Boolean):[]; }
     function titleFromBase(base){
       // base like "1-on-1-plus-1-deep-seals" -> pretty title
@@ -831,8 +1208,8 @@
         arr.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
         const id = base; // stable id
         const title = titleFromBase(base);
-        const category = catOverrides[id] || guessCategoryFromName(base);
-        exercises.push({
+       const category =
+  catOverrides[id] || categoryFromContentsTitle(title) || guessCategoryFromName(base); exercises.push({
           id,
           title,
           base,
@@ -900,15 +1277,16 @@
     }
 
    function matches(ex, tokens){
-  if(tokens.length === 0) return true;
+  if(tokens.length===0) return true;
 
-  const haystack = norm([
+  const hay = norm([
     ex.title,
     ex.category,
-    ex.base
+    ex.base,
+    ex.ocrText || ""
   ].join(" "));
 
-  return tokens.every(token => haystack.indexOf(token) !== -1);
+  return tokens.every(t => hay.includes(t));
 }
     
 
@@ -923,6 +1301,7 @@
 
     function renderExercises(){
       const items = visibleExercises();
+      document.getElementById("hitCount").textContent = items.length;
       if(!items.length){
         listEl.innerHTML = `<div class="empty">Keine Treffer. Prüfe Filter oder Suche.</div>`;
         return;
@@ -1053,6 +1432,20 @@
       saveJSON(LS.notes, notesById);
       alert("Notizen gespeichert ✅");
     });
+
+    $("exEditCat").addEventListener("click", ()=>{
+  if(!CURRENT) return;
+
+  const next = prompt(
+    "Neue Kategorie:\n\n" + CATEGORIES.join("\n"),
+    CURRENT.category
+  );
+
+  if(!next) return;
+
+  setExerciseCategory(CURRENT, next.trim());
+  render();
+});
 
     $("exEditCat").addEventListener("click", ()=>{
       if(!currentExercise) return;
@@ -1489,6 +1882,14 @@
       localStorage.removeItem(LS.manifestCache);
       location.reload();
     });
+    document.getElementById("btnOcr").addEventListener("click", async ()=>{
+  alert("OCR startet. Das dauert einmalig.");
+
+  await buildOcrIndex(EXERCISES);
+
+  alert("OCR fertig – Suche kann jetzt Text aus Bildern.");
+  render();
+});
 
     /* =========================
        Tabs, Search, Shortcuts
@@ -1525,10 +1926,7 @@
       // gentle warning if some filenames still contain uppercase/spaces (will still work locally but better normalized)
       const bad = EXERCISES.flatMap(e=>e.screenshots.map(s=>s.replace(/^assets\/previews\//,"")))
         .filter(f=>/[A-Z ]/.test(f));
-      if(bad.length){
-        $("hintBox").innerHTML = `<b>Hinweis:</b> Einige Dateinamen enthalten noch Großbuchstaben/Leerzeichen. Lokal geht das oft, online kann es Probleme machen.<br>
-        Beispiel: <code>${escapeHTML(bad[0])}</code>`;
-      }
+     
 
       renderChips();
       setTab(activeTab);
