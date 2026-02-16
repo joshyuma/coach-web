@@ -575,20 +575,11 @@
   </div>
 
   <script>
-    "use strict";
-    function applyCategoryOverrides(){
-  if(!Array.isArray(EXERCISES)) return;
+"use strict";
 
-  for(const ex of EXERCISES){
-    if(!ex || !ex.id) continue;
-    const ov = catOverrides[ex.id];
-    if(ov) ex.category = ov;
-  }
-}
-// =========================
-// OCR ADDON
-// =========================
-
+/* =========================
+   OCR ADDON
+========================= */
 const OCR = {
   enabled: true,
   lang: "eng",
@@ -624,6 +615,7 @@ async function ocrImage(url){
 
 async function buildOcrIndex(exercises){
   let i = 0;
+  const workers = Math.max(1, OCR.concurrency|0);
 
   async function worker(){
     while(i < exercises.length){
@@ -631,43 +623,39 @@ async function buildOcrIndex(exercises){
       const img = ex?.screenshots?.[0];
       if(!img){ ex.ocrText=""; continue; }
 
-      try{
-        ex.ocrText = await ocrImage(img);
-      }catch{
-        ex.ocrText = "";
-      }
+      try{ ex.ocrText = await ocrImage(img); }
+      catch{ ex.ocrText = ""; }
     }
   }
 
-  await Promise.all([worker(),worker()]);
+  await Promise.all(Array.from({length: workers}, ()=>worker()));
 }
-    /* =========================
-       Kategorien nach Inhaltsverzeichnis
-       ========================= */
-    const CATEGORIES = [
-      "FINISHING",
-      "CLOSEOUTS",
-      "SHOOTING",
-      "DRIBBLING",
-      "PASSING",
-      "DEFENSE",
-      "POST",
-      "REBOUNDING",
-      "PLAYER DEV MIX ACTIVITIES",
-      "TEAM DEV MIX ACTIVITIES",
-      "TRIGGERS",
-      "TRANSITION",
-      "PICK AND ROLL",
-      "DOMINOES REACTIONS",
-      "WARM-UPS & ENERGIZERS"
-    ];
 
-    /* =========================
+/* =========================
+   Kategorien
+========================= */
+const CATEGORIES = [
+  "FINISHING",
+  "CLOSEOUTS",
+  "SHOOTING",
+  "DRIBBLING",
+  "PASSING",
+  "DEFENSE",
+  "POST",
+  "REBOUNDING",
+  "PLAYER DEV MIX ACTIVITIES",
+  "TEAM DEV MIX ACTIVITIES",
+  "TRIGGERS",
+  "TRANSITION",
+  "PICK AND ROLL",
+  "DOMINOES REACTIONS",
+  "WARM-UPS & ENERGIZERS"
+];
+
+/* =========================
    Inhaltsverzeichnis-Zuordnung (Titel → Kategorie)
-   Diese Liste ist die Wahrheit. Damit ist "Passing" korrekt,
-   auch wenn das Wort "passing" NICHT im Dateinamen steht.
-   ========================= */
-
+   (deine Wahrheit)
+========================= */
 const CATEGORY_TITLES = {
   "FINISHING": [
     "1-on-1 Around the Arc",
@@ -907,7 +895,7 @@ const CATEGORY_TITLES = {
     "Pylon Exchanges",
     "Rock Paper Scissors",
     "Sheep and Wolf Tag",
-    "Stance Games",
+    "Stance Sames",
     "Tennis Ball Catches",
     "Tennis Ball Drops",
     "Tic Tac Toe Relay"
@@ -918,8 +906,8 @@ const CATEGORY_TITLES = {
 function keyFromTitle(s){
   return (s||"")
     .toLowerCase()
-    .replaceAll("’","'")        // typographisches Apostroph
-    .replace(/[^a-z0-9]+/g," ") // alles zu Wörtern
+    .replace(/[’‘]/g,"'")          // typographisches Apostroph
+    .replace(/[^a-z0-9]+/g," ")    // alles zu Wörtern
     .trim()
     .replace(/\s+/g," ");
 }
@@ -936,356 +924,402 @@ const TITLE_TO_CATEGORY = (() => {
 })();
 
 function categoryFromContentsTitle(exTitle){
-  return TITLE_TO_CATEGORY[keyFromTitle(exTitle)] || null;
+
+  const k = keyFromTitle(exTitle);
+
+  // 1. EXAKTE Inhaltsverzeichnis-Zuordnung
+  if(TITLE_TO_CATEGORY[k]) return TITLE_TO_CATEGORY[k];
+
+  // 2. FALLBACK KEYWORDS (gegen Tippfehler)
+// extra normalize: "3on3" -> "3 on 3", "1on1" -> "1 on 1"
+const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
+  // Closeouts
+  if(/closeout|close outs|multi skip|multiskip|bounce closeout|bounce closeouts|blast|pickup|pick up|conegate|cone gate/.test(s))
+    return "CLOSEOUTS";
+
+  // Finishing
+  if(/finish|finishes|rim|chase|perceptual|poster|posters|guided series|touchdown/.test(s))
+    return "FINISHING";
+
+  // Shooting
+  if(/shoot|shooting|figure|drift|lift|exit footwork/.test(s))
+    return "SHOOTING";
+
+  // Dribbling
+  if(/dribble|dribbling|grid|skate|skates|hostage|hip turn|spanish|sumo|through the gate|change of speed/.test(s))
+    return "DRIBBLING";
+
+  // Defense
+  if(/defen|defense|protect the rim|mirror game|seven seconds|chest blows|close the gate|lane turns|protect he paint|open and chasesurprise\b/.test(s))
+    return "DEFENSE";
+
+  // Passing
+  if(/pass|passing|1 on 1 tennis|rapid fire|pivot surprise|rondo|keep away|handball|four sports|4 sports|take two passing/.test(s))
+    return "PASSING";
+
+  // Post
+  if(/t post|t\-post|deep hooks|deep seals|quick ups|post reactions|post surprise/.test(s))
+    return "POST";
+
+  // Rebounding
+  if(/rebound|rebounding|hot potato|weak side/.test(s))
+    return "REBOUNDING";
+
+  // Player Dev Mix
+  if(/aces|exit passes|gap positioning|retreat|two ball|2 ball|get flashes|get open|find space/.test(s))
+    return "PLAYER DEV MIX ACTIVITIES";
+
+  // Pick and Roll (PNR + switch/under usw)
+  if(/pick and roll|pick\-and\-roll|pnr|twist vs under|twist versus under|under\b|avoid the pick|cancel the pick|australia|call the coverage|gentleman|hi lo|high\-low|stack pick and roll|what weapon|scram switch|swing to random/.test(s))
+    return "PICK AND ROLL";
+
+  // Team Dev Mix (ADV / Advantage usw)
+  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|4 on 5|5 on 5|6 on 5|zone|ppp scoring|scramble|fortnite|battleship|cambio|team scoring system|surpise|floor is lava/.test(s))
+    return "TEAM DEV MIX ACTIVITIES";
+
+  // Transition
+  if(/transition|5 on 5 wheel start|train transition|leak out|outlet|rugby|line touch|two side x out|two\-side x\-out/.test(s))
+    return "TRANSITION";
+
+  // Triggers (Coach Tag gehört bei dir zu Dominoes, nicht zu Triggers)
+  if(/cross screen|down screen|touch action/.test(s))
+    return "TRIGGERS";
+
+  // Dominoes Reactions (Coach Tag, Bursts, Criss-Cross, Domino Drills)
+  if(/domino|reaction|coach tag|coach touch|criss cross|criss\-cross|two side coach tag|two\-side coach tag|burst|bursts|tursts|wave|wheel skip|lateral stack|post pen|post\-pen|2 on 2 weave|zero seconds/.test(s))
+    return "DOMINOES REACTIONS";
+
+  // Warm-ups & Energizers
+  if(/warm|energ|stance games|tennis ball drops|tic tac toe|rock paper scissors|capture the flag|circle tag|cone reaction|pylon exchanges|sheep and wolf|bing bang bong/.test(s))
+    return "WARM-UPS & ENERGIZERS";
+
+  return null;
+
+  if(/closeout|blast|pickup/.test(s)) return "CLOSEOUTS";
+  if(/finish|rim|paint|chase/.test(s)) return "FINISHING";
+  if(/shoot|figure/.test(s)) return "SHOOTING";
+  if(/dribble|grid|skate|hostage/.test(s)) return "DRIBBLING";
+  if(/pass|tennis|rapid/.test(s)) return "PASSING";
+  if(/defen|protect|mirror/.test(s)) return "DEFENSE";
+  if(/rebound/.test(s)) return "REBOUNDING";
+  if(/post/.test(s)) return "POST";
+  if(/trigger/.test(s)) return "TRIGGERS";
+  if(/transition|wheel/.test(s)) return "TRANSITION";
+  if(/pick|roll|switch/.test(s)) return "PICK AND ROLL";
+  if(/domino|reaction|burst/.test(s)) return "DOMINOES REACTIONS";
+  if(/warm|energ|stance|tennis ball/.test(s)) return "WARM-UPS & ENERGIZERS";
+  if(/team/.test(s)) return "TEAM DEV MIX ACTIVITIES";
+
+  return null;
 }
 
-   function guessCategoryFromName(filename){
-const f = filename.toLowerCase();
+/* =========================
+   Storage Keys  (WICHTIG: catOverrides war bei dir kaputt)
+========================= */
+const LS = {
+  tab: "coach_tab_final_v1",
+  cats: "coach_cats_final_v1",
+  fav: "coach_fav_final_v1",
+  notes: "coach_notes_final_v1",
+  trainings: "coach_trainings_final_v1",
+  catOverrides: "coach_cat_overrides_final_v1",     // <- FIX
+  manifestCache: "coach_manifest_cache_final_v1"
+};
 
-// ================= WARM UPS =================
-if([
-"bing","capture","circle","cone-reaction","pylon-exchanges","rock-paper","sheep","stance",
-"tennis-ball","tic-tac","red-light","pac-man","hunter","line-tag","mirror","push-out",
-"four-spots","take-two","animals","breakout","fortnite","battleship","ppp","scramble",
-"stack-start","surprise","team-scoring"
-].some(k=>f.includes(k))) return "WARM-UPS & ENERGIZERS";
+/* =========================
+   Helpers
+========================= */
+const $ = (id)=>document.getElementById(id);
 
-// ================= FINISHING =================
-if([
-"around-the-arc","blind-start","block","bump-tap","cat-and-mouse","chasedown",
-"continuous-posters","corner-finishes","double-contest","elbow-touches","five-spots",
-"guided-series","guided-vs-primary","hi-5","loop","multi-primary","octopus","paint-escape",
-"shadow","sideline","smile","surprise-handoff","trail","wing-finishes","wing-touchdown",
-"x-out","plus-1","plus-2","chaos","perceptual"
-].some(k=>f.includes(k))) return "FINISHING";
-
-// ================= CLOSEOUTS =================
-if([
-"closeout","cone-blasts","cone-touch","blast","bounce","guided-catch","multi-skip",
-"sprint","pick-up","burst","corner","high-five"
-].some(k=>f.includes(k))) return "CLOSEOUTS";
-
-// ================= SHOOTING =================
-if([
-"figure","drift","exit-footwork","push-off","contact","move-the-cones","cone-tag","catch-me"
-].some(k=>f.includes(k))) return "SHOOTING";
-
-// ================= DRIBBLING =================
-if([
-"change-of-speed","dribble","grid","hip-turn","skates","hostage","routed","skate",
-"spanish","straight-line","sumo","gate","touchdown","gladiator","mirror-dribbling",
-"pac-man","pylon","team-tag","team-knockout"
-].some(k=>f.includes(k))) return "DRIBBLING";
-
-// ================= DEFENSE =================
-if([
-"seven-seconds","chest","close-the-gate","lane-turns","mirror-game","open-and-chase",
-"protect-the-paint","surprise","prison"
-].some(k=>f.includes(k))) return "DEFENSE";
-
-// ================= PASSING =================
-if([
-"ping","tennis","grid-passing","make-a-lead","rapid-fire","three-in-a-row","pivot",
-"bowling","rondo","keep-away","handball","four-sports","pass-tag"
-].some(k=>f.includes(k))) return "PASSING";
-
-// ================= POST =================
-if([
-"quick-ups","deep-hooks","deep-seals","continuous","t-post","career","post-reactions","post-surprise"
-].some(k=>f.includes(k))) return "POST";
-
-// ================= REBOUNDING =================
-if([
-"shuffle","hot-potato","weak-side"
-].some(k=>f.includes(k))) return "REBOUNDING";
-
-// ================= PLAYER DEV MIX =================
-if([
-"aces","exit-passes","gap-positioning","pick-up","retreat","two-ball","get-flashes",
-"trail-and-cut","get-open","find-space","smash-or-slip","twist","two-on-two-gets"
-].some(k=>f.includes(k))) return "PLAYER DEV MIX ACTIVITIES";
-
-// ================= PICK & ROLL =================
-if([
-"avoid","cancel","australia","coverage","gentleman","high-low","stack","weapon",
-"scram","random-pnr"
-].some(k=>f.includes(k))) return "PICK AND ROLL";
-
-// ================= TRIGGERS =================
-if([
-"cross-screen","touch-action","down-screen"
-].some(k=>f.includes(k))) return "TRIGGERS";
-
-// ================= TRANSITION =================
-if([
-"leak","continuous-hc","skip-or-push","x-out","outlet","rugby","line-touch",
-"train-transition","wheel","spacing"
-].some(k=>f.includes(k))) return "TRANSITION";
-
-// ================= DOMINOES =================
-if([
-"domino","post-pen","wheel-skip","zero-seconds","coach-tag","criss-cross","bursts"
-].some(k=>f.includes(k))) return "DOMINOES REACTIONS";
-
-// ================= TEAM DEV MIX =================
-if([
-"neutral","three-stages","attack","charger","zone","mouse","turtle","battleship",
-"cambio","ppp","scramble","stack-start","surprise","floor"
-].some(k=>f.includes(k))) return "TEAM DEV MIX ACTIVITIES";
-
-return "unsorted";
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){
+    return fallback;
+  }
+}
+function saveJSON(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+}
+function escapeHTML(s){
+  return (s+"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function norm(s){
+  return (s||"")
+    .toLowerCase()
+    .replaceAll("ä","ae").replaceAll("ö","oe").replaceAll("ü","ue").replaceAll("ß","ss")
+    .replace(/[’‘]/g,"'")
+    .replace(/[^a-z0-9]+/g," ")
+    .trim();
+}
+function tokenize(q){
+  const n = norm(q);
+  return n ? n.split(/\s+/).filter(Boolean) : [];
 }
 
-    /* =========================
-       Storage Keys
-       ========================= */
-    const LS = {
-      tab: "coach_tab_final_v1",
-      cats: "coach_cats_final_v1",
-      fav: "coach_fav_final_v1",
-      notes: "coach_notes_final_v1",
-      trainings: "coach_trainings_final_v1",
-      catOverrides: "coach_cat_overrides_final_v1",
-      manifestCache: "coach_manifest_cache_final_v1"
-    };
+function titleFromBase(base){
+  // base like "1-on-1-plus-1-deep-seals" -> pretty title
+  let t = base.replace(/\.png$/i,"");
+  t = t.replace(/-([0-9]+)$/,""); // remove "-1" suffix (if passed)
+  t = t.replaceAll("-", " ");
+  // normalize some patterns
+  t = t.replace(/\bplus\b/g, "+");
+  t = t.replace(/\b(on)\b/g, "on");
+  // Title Case-ish
+  t = t.split(" ").filter(Boolean).map(w=>{
+    if(/^[0-9]+$/.test(w)) return w;
+    if(w==="on" || w==="vs") return w;
+    if(w==="pnr") return "PNR";
+    if(w.length<=2 && w.includes("+")) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(" ");
 
- 
+  // Fix "1 On 1" to "1-on-1"
+  t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2");
+  t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2-on-$3");
+  t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sPlus\s([0-9]+)\b/g, "$1-on-$2+$3");
+  t = t.replace(/\s+/g," ").trim();
+  return t;
+}
 
-    /* =========================
-       Helpers
-       ========================= */
-      function setExerciseCategory(ex, newCat){
-  if(!newCat) return;
+function baseKeyFromFilename(filename){
+  // group multi-image drills like "...-1.png", "...-2.png"
+  let f = filename.replace(/^.*\//,""); // strip folder if any
+  f = f.replace(/\.png$/i,"");
+  f = f.replace(/-[0-9]+$/,""); // remove trailing -1/-2
+  return f;
+}
 
-  // exakt so schreiben, wie deine Kategorien heißen (Array CATEGORIES existiert bei dir)
-  if(!CATEGORIES.includes(newCat)){
-    alert("Unbekannte Kategorie: " + newCat);
+function sortByNumberSuffix(a,b){
+  // for images within same base: -1, -2, else 0
+  const na = (a.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(a.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+  const nb = (b.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(b.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+  return na - nb;
+}
+
+function nowId(){
+  return "tr_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+}
+
+/* =========================
+   Category Overrides (nur lokal)
+========================= */
+function setExerciseCategory(ex, newCat){
+  if(!ex || !ex.id) return;
+  const cat = (newCat||"").trim();
+  if(!cat) return;
+
+  if(!CATEGORIES.includes(cat)){
+    alert("Unbekannte Kategorie: " + cat);
     return;
   }
 
-  ex.category = newCat;               // sofort im UI sichtbar
-  catOverrides[ex.id] = newCat;       // dauerhaft speichern (auch wenn Button später weg ist)
+  ex.category = cat;
+  catOverrides[ex.id] = cat;
   saveJSON(LS.catOverrides, catOverrides);
-} 
-    const $ = (id)=>document.getElementById(id);
-    function loadJSON(key, fallback){ try{ const raw=localStorage.getItem(key); return raw?JSON.parse(raw):fallback; }catch(e){ return fallback; } }
-    function saveJSON(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-    function escapeHTML(s){ return (s+"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
-    function norm(s){
-      return (s||"")
-        .toLowerCase()
-        .replaceAll("ä","ae").replaceAll("ö","oe").replaceAll("ü","ue").replaceAll("ß","ss")
-        .replace(/[^a-z0-9]+/g," ")
-        .trim();
+}
+
+function applyCategoryOverrides(){
+  if(!Array.isArray(EXERCISES)) return;
+  for(const ex of EXERCISES){
+    const ov = catOverrides?.[ex.id];
+    if(ov && CATEGORIES.includes(ov)) ex.category = ov;
+  }
+}
+
+/* =========================
+   App State
+========================= */
+let activeTab = loadJSON(LS.tab, "exercises"); // exercises|trainings|favs
+let selectedCats = loadJSON(LS.cats, []);      // category filters
+let favorites = new Set(loadJSON(LS.fav, []));
+let notesById = loadJSON(LS.notes, {});
+let trainings = loadJSON(LS.trainings, []);
+let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
+let EXERCISES = []; // loaded from manifest/listing
+
+const searchEl = $("search");
+const chipsEl  = $("chips");
+const listEl   = $("list");
+
+/* =========================
+   Loader (Manifest für GitHub Pages)
+   FIX: wir probieren beide Pfade:
+        assets/manifest.json UND assets/previews/manifest.json
+========================= */
+async function fetchJsonTry(url){
+  const res = await fetch(url, { cache: "no-cache" });
+  if(!res.ok) throw new Error("NOT_OK " + url);
+  return await res.json();
+}
+
+async function loadManifestFiles(){
+  // Priorität: assets/manifest.json, dann assets/previews/manifest.json
+  let data;
+  try{
+    data = await fetchJsonTry("assets/manifest.json");
+  }catch{
+    data = await fetchJsonTry("assets/previews/manifest.json");
+  }
+  if(!data || !Array.isArray(data.files)) throw new Error("manifest.json Format falsch");
+  return data.files;
+}
+
+function parseLinksFromDirectoryHtml(html){
+  const files = [];
+  const re = /href="([^"]+?\.png)"/gi;
+  let m;
+  while((m=re.exec(html))!==null){
+    let href = m[1];
+    if(href.startsWith("?") || href.startsWith("/") || href.includes("..")) continue;
+    href = href.split("?")[0];
+    files.push(href);
+  }
+  return Array.from(new Set(files));
+}
+
+async function loadFromDirectoryListing(){
+  const res = await fetch("assets/previews/", { cache: "no-cache" });
+  if(!res.ok) throw new Error("Directory listing nicht erreichbar");
+  const html = await res.text();
+  return parseLinksFromDirectoryHtml(html);
+}
+
+function normalizeFileToUrl(f){
+  // f kann sein:
+  //  - "abc.png"
+  //  - "assets/previews/abc.png"
+  //  - "assets/abc.png"
+  //  - "previews/abc.png"
+  const s = (f||"").trim();
+  if(!s) return null;
+
+  if(s.startsWith("assets/")) return s;
+  if(s.startsWith("previews/")) return "assets/" + s; // previews/.. -> assets/previews/..
+  return "assets/previews/" + s; // nur filename -> previews
+}
+
+async function loadAllExercises(){
+  let files = [];
+
+  // 1) manifest.json (GitHub Pages)
+  try{
+    files = await loadManifestFiles();
+  }catch(e){
+    // 2) directory listing (lokal python server)
+    try{
+      files = await loadFromDirectoryListing();
+    }catch(e2){
+      // 3) cached manifest
+      const cached = loadJSON(LS.manifestCache, []);
+      if(Array.isArray(cached) && cached.length) files = cached;
+      else files = [];
     }
-    
-    function tokenize(q){ const n=norm(q); return n? n.split(/\s+/).filter(Boolean):[]; }
-    function titleFromBase(base){
-      // base like "1-on-1-plus-1-deep-seals" -> pretty title
-      let t = base.replace(/\.png$/i,"");
-      t = t.replace(/-([0-9]+)$/,""); // remove "-1" suffix (if passed)
-      t = t.replaceAll("-", " ");
-      // normalize some patterns
-      t = t.replace(/\bplus\b/g, "+");
-      t = t.replace(/\b(on)\b/g, "on");
-      // Title Case-ish
-      t = t.split(" ").filter(Boolean).map(w=>{
-        if(/^[0-9]+$/.test(w)) return w;
-        if(w==="on" || w==="vs") return w;
-        if(w==="pnr") return "PNR";
-        if(w.length<=2 && w.includes("+")) return w;
-        return w.charAt(0).toUpperCase() + w.slice(1);
-      }).join(" ");
-      // Fix "1 On 1" to "1-on-1"
-      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2");
-      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2-on-$3");
-      t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\sPlus\s([0-9]+)\b/g, "$1-on-$2+$3");
-      t = t.replace(/\s+/g," ").trim();
-      return t;
-    }
+  }
 
-    function baseKeyFromFilename(filename){
-      // group multi-image drills like "...-1.png", "...-2.png"
-      let f = filename.replace(/^.*\//,""); // strip folder if any
-      f = f.replace(/\.png$/i,"");
-      f = f.replace(/-[0-9]+$/,""); // remove trailing -1/-2
-      return f;
-    }
+  if(files.length) saveJSON(LS.manifestCache, files);
 
-    function sortByNumberSuffix(a,b){
-      // for images within same base: -1, -2, else 0
-      const na = (a.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(a.match(/-([0-9]+)\.png$/i)[1],10) : 0;
-      const nb = (b.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(b.match(/-([0-9]+)\.png$/i)[1],10) : 0;
-      return na - nb;
-    }
+  const resolved = files
+    .filter(x => typeof x === "string")
+    .map(x => x.trim())
+    .filter(Boolean)
+    .map(normalizeFileToUrl)
+    .filter(Boolean);
 
-    function nowId(){ return "tr_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16); }
+  // group by base key
+  const groups = new Map();
+  for(const full of resolved){
+    const filename = full.replace(/^.*\//,"");
+    if(!filename.toLowerCase().endsWith(".png")) continue;
 
-    /* =========================
-       App State
-       ========================= */
-    let activeTab = loadJSON(LS.tab, "exercises"); // exercises|trainings|favs
-    let selectedCats = loadJSON(LS.cats, []); // category filters
-    let favorites = new Set(loadJSON(LS.fav, []));
-    let notesById = loadJSON(LS.notes, {});
-    let trainings = loadJSON(LS.trainings, []);
-    let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
-    let EXERCISES = []; // loaded from manifest/listing
+    const base = baseKeyFromFilename(filename);
+    if(!groups.has(base)) groups.set(base, []);
+    groups.get(base).push(full);
+  }
 
-    const searchEl = $("search");
-    const chipsEl = $("chips");
-    const listEl = $("list");
+  // build exercises
+  const exercises = [];
+  for(const [base, arr] of groups.entries()){
+    arr.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
+    const id = base;
+    const title = titleFromBase(base);
 
-    /* =========================
-       Loader: manifest.json first, fallback parse directory listing (works on Python server)
-       ========================= */
-    async function loadManifestJson(){
-      const res = await fetch("assets/manifest.json", { cache: "no-cache" });
-      if(!res.ok) throw new Error("manifest.json nicht gefunden");
-      const data = await res.json();
-      if(!data || !Array.isArray(data.files)) throw new Error("manifest.json Format falsch");
-      return data.files;
-    }
+    // KATEGORIE: aus Inhaltsverzeichnis (deine Liste)
+    const mapped = categoryFromContentsTitle(title);
 
-    function parseLinksFromDirectoryHtml(html){
-      // parse href="...png" links
-      const files = [];
-      const re = /href="([^"]+?\.png)"/gi;
-      let m;
-      while((m=re.exec(html))!==null){
-        let href = m[1];
-        // ignore parent link
-        if(href.startsWith("?") || href.startsWith("/") || href.includes("..")) continue;
-        // decode and strip query
-        href = href.split("?")[0];
-        // python server listing returns raw filenames; keep them
-        files.push(href);
-      }
-      // also accept percent-encoded
-      return Array.from(new Set(files));
-    }
+    // Fallback: wenn nichts gefunden wurde, bleibt "unsorted" (aber du willst am Ende alles in der Liste haben)
+    const category = mapped || "unsorted";
 
-    async function loadFromDirectoryListing(){
-      const res = await fetch("assets/previews/", { cache: "no-cache" });
-      if(!res.ok) throw new Error("Directory listing nicht erreichbar");
-      const html = await res.text();
-      return parseLinksFromDirectoryHtml(html);
-    }
+    exercises.push({ id, title, base, category, screenshots: arr, ocrText: "" });
+  }
 
-    async function loadAllExercises(){
-      let files = [];
-      // 1) try manifest.json (needed for GitHub Pages)
-      try{
-        files = await loadManifestJson();
-      }catch(e){
-        // 2) fallback: directory listing (works on python -m http.server)
-        try{
-          files = await loadFromDirectoryListing();
-        }catch(e2){
-          // 3) fallback: cached manifest from last successful run
-          const cached = loadJSON(LS.manifestCache, []);
-          if(Array.isArray(cached) && cached.length) files = cached;
-          else files = [];
-        }
-      }
+  EXERCISES = exercises;
 
-      if(files.length){
-        saveJSON(LS.manifestCache, files);
-      }
+  // apply local overrides (falls du manuell umsortiert hast)
+  applyCategoryOverrides();
 
-      // normalize: accept either full paths or just filenames
-      const resolved = files
-        .filter(f => typeof f === "string")
-        .map(f => f.trim())
-        .filter(Boolean)
-        .map(f => f.startsWith("assets/") ? f : ("assets/previews/" + f));
+  // sort by category, then title
+  EXERCISES.sort((a,b)=>{
+    const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+    const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+    return c !== 0 ? c : a.title.localeCompare(b.title);
+  });
 
-      // group by base key
-      const groups = new Map();
-      for(const full of resolved){
-        const filename = full.replace(/^.*\//,"");
-        if(!filename.toLowerCase().endsWith(".png")) continue;
+  $("subline").textContent = `${EXERCISES.length} Übungen geladen • Trainings • PDF Export`;
+}
 
-        const base = baseKeyFromFilename(filename);
-        if(!groups.has(base)) groups.set(base, []);
-        groups.get(base).push(full);
-      }
+/* =========================
+   UI Render
+========================= */
+function setTab(tab){
+  activeTab = tab;
+  saveJSON(LS.tab, activeTab);
 
-      // build exercises
-      const exercises = [];
-      for(const [base, arr] of groups.entries()){
-        arr.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
-        const id = base; // stable id
-        const title = titleFromBase(base);
-       const category =
-  catOverrides[id] || categoryFromContentsTitle(title) || guessCategoryFromName(base); exercises.push({
-          id,
-          title,
-          base,
-          category,
-          screenshots: arr
-        });
-      }
+  $("tabExercises").setAttribute("data-on", tab==="exercises" ? "1":"0");
+  $("tabTrainings").setAttribute("data-on", tab==="trainings" ? "1":"0");
+  $("tabFavs").setAttribute("data-on", tab==="favs" ? "1":"0");
 
-      // sort by category, then title
-      exercises.sort((a,b)=>{
-        const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
-        const c = (ca===-1?999:ca) - (cb===-1?999:cb);
-        return c !== 0 ? c : a.title.localeCompare(b.title);
-      });
+  if(tab==="trainings"){
+    $("rightTitle").textContent = "Trainings";
+    $("rightSub").textContent = "Training öffnen → Reihenfolge → Export als PDF";
+  }else if(tab==="favs"){
+    $("rightTitle").textContent = "Favoriten";
+    $("rightSub").textContent = "Nur deine Favoriten (mit Filter & Suche)";
+  }else{
+    $("rightTitle").textContent = "Übungen";
+    $("rightSub").textContent = "Tippe eine Übung → Vorschau → zu Training / Favorit";
+  }
+  render();
+}
 
-      EXERCISES = exercises;
+function renderChips(){
+  chipsEl.innerHTML = CATEGORIES.map(cat=>{
+    const on = selectedCats.includes(cat) ? "1":"0";
+    return `<div class="chip" data-cat="${escapeHTML(cat)}" data-on="${on}" role="button" tabindex="0">
+      <span class="dot"></span><span>${escapeHTML(cat)}</span></div>`;
+  }).join("");
 
-      // update subtitle
-      $("subline").textContent = `${EXERCISES.length} Übungen geladen • Trainings • PDF Export`;
-    }
-
-    /* =========================
-       UI Render
-       ========================= */
-    function setTab(tab){
-      activeTab = tab;
-      saveJSON(LS.tab, activeTab);
-
-      $("tabExercises").setAttribute("data-on", tab==="exercises" ? "1":"0");
-      $("tabTrainings").setAttribute("data-on", tab==="trainings" ? "1":"0");
-      $("tabFavs").setAttribute("data-on", tab==="favs" ? "1":"0");
-
-      if(tab==="trainings"){
-        $("rightTitle").textContent = "Trainings";
-        $("rightSub").textContent = "Training öffnen → Reihenfolge → Export als PDF";
-      }else if(tab==="favs"){
-        $("rightTitle").textContent = "Favoriten";
-        $("rightSub").textContent = "Nur deine Favoriten (mit Filter & Suche)";
-      }else{
-        $("rightTitle").textContent = "Übungen";
-        $("rightSub").textContent = "Tippe eine Übung → Vorschau → zu Training / Favorit";
-      }
+  chipsEl.querySelectorAll(".chip").forEach(ch=>{
+    const cat = ch.getAttribute("data-cat");
+    const toggle = ()=>{
+      selectedCats = selectedCats.includes(cat)
+        ? selectedCats.filter(x=>x!==cat)
+        : [...selectedCats, cat];
+      saveJSON(LS.cats, selectedCats);
       render();
-    }
+    };
+    ch.addEventListener("click", toggle);
+    ch.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); }});
+  });
+}
 
-    function renderChips(){
-      chipsEl.innerHTML = CATEGORIES.map(cat=>{
-        const on = selectedCats.includes(cat) ? "1":"0";
-        return `<div class="chip" data-cat="${escapeHTML(cat)}" data-on="${on}" role="button" tabindex="0">
-          <span class="dot"></span><span>${escapeHTML(cat)}</span></div>`;
-      }).join("");
-
-      chipsEl.querySelectorAll(".chip").forEach(ch=>{
-        const cat = ch.getAttribute("data-cat");
-        const toggle = ()=>{
-          selectedCats = selectedCats.includes(cat)
-            ? selectedCats.filter(x=>x!==cat)
-            : [...selectedCats, cat];
-          saveJSON(LS.cats, selectedCats);
-          render();
-        };
-        ch.addEventListener("click", toggle);
-        ch.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); }});
-      });
-    }
-
-   function matches(ex, tokens){
+function matches(ex, tokens){
   if(tokens.length===0) return true;
 
   const hay = norm([
@@ -1297,658 +1331,628 @@ return "unsorted";
 
   return tokens.every(t => hay.includes(t));
 }
-    
 
-    function visibleExercises(){
-      const tokens = tokenize(searchEl.value);
-      let base = EXERCISES.slice();
-      if(activeTab==="favs") base = base.filter(e => favorites.has(e.id));
-      if(selectedCats.length) base = base.filter(e => selectedCats.includes(e.category));
-      if(tokens.length) base = base.filter(e => matches(e, tokens));
-      return base;
-    }
+function visibleExercises(){
+  const tokens = tokenize(searchEl.value);
+  let base = EXERCISES.slice();
+  if(activeTab==="favs") base = base.filter(e => favorites.has(e.id));
+  if(selectedCats.length) base = base.filter(e => selectedCats.includes(e.category));
+  if(tokens.length) base = base.filter(e => matches(e, tokens));
+  return base;
+}
 
-    function renderExercises(){
-      const items = visibleExercises();
-      document.getElementById("hitCount").textContent = items.length;
-      if(!items.length){
-        listEl.innerHTML = `<div class="empty">Keine Treffer. Prüfe Filter oder Suche.</div>`;
-        return;
-      }
+function renderExercises(){
+  const items = visibleExercises();
+  $("hitCount").textContent = items.length;
 
-      listEl.innerHTML = items.map(ex=>{
-        const favOn = favorites.has(ex.id) ? "1":"0";
-        const sc = (ex.screenshots||[]).length;
-        const thumb = ex.screenshots?.[0] || "";
-        return `<div class="card" data-id="${escapeHTML(ex.id)}" role="button" tabindex="0">
-          <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="preview">` : `<div class="ph">kein Bild</div>`}</div>
-          <div class="meta">
-            <p class="t">${escapeHTML(ex.title)}</p>
-            <div class="s">
-              <span class="pill">🏷 ${escapeHTML(ex.category)}</span>
-              <span class="pill">🖼 ${sc} Bild${sc===1?"":"er"}</span>
-            </div>
-          </div>
-          <button class="iconbtn" data-on="${favOn}" aria-label="Favorit">${favOn==="1"?"★":"☆"}</button>
-        </div>`;
-      }).join("");
+  if(!items.length){
+    listEl.innerHTML = `<div class="empty">Keine Treffer. Prüfe Filter oder Suche.</div>`;
+    return;
+  }
 
-      listEl.querySelectorAll(".card").forEach(card=>{
-        const id = card.getAttribute("data-id");
-        const favBtn = card.querySelector(".iconbtn");
-        favBtn.addEventListener("click",(e)=>{
-          e.stopPropagation();
-          toggleFav(id);
-          render();
-        });
-        const open = ()=>openExercise(id);
-        card.addEventListener("click", open);
-        card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
-      });
-    }
+  listEl.innerHTML = items.map(ex=>{
+    const favOn = favorites.has(ex.id) ? "1":"0";
+    const sc = (ex.screenshots||[]).length;
+    const thumb = ex.screenshots?.[0] || "";
+    return `<div class="card" data-id="${escapeHTML(ex.id)}" role="button" tabindex="0">
+      <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="preview">` : `<div class="ph">kein Bild</div>`}</div>
+      <div class="meta">
+        <p class="t">${escapeHTML(ex.title)}</p>
+        <div class="s">
+          <span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+          <span class="pill">🖼 ${sc} Bild${sc===1?"":"er"}</span>
+        </div>
+      </div>
+      <button class="iconbtn" data-on="${favOn}" aria-label="Favorit">${favOn==="1"?"★":"☆"}</button>
+    </div>`;
+  }).join("");
 
-    function renderTrainings(){
-      if(!trainings.length){
-        listEl.innerHTML = `<div class="empty">Noch kein Training. Tippe oben auf <b>+ Training</b>.</div>`;
-        return;
-      }
-      const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-      listEl.innerHTML = sorted.map(tr=>{
-        const n = (tr.items||[]).length;
-        return `<div class="card" data-tr="${escapeHTML(tr.id)}" role="button" tabindex="0">
-          <div class="thumb"><div class="ph">TR</div></div>
-          <div class="meta">
-            <p class="t">${escapeHTML(tr.name)}</p>
-            <div class="s">
-              <span class="pill">🧩 ${n} Übung${n===1?"":"en"}</span>
-              <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||tr.createdAt||Date.now()).toLocaleString())}</span>
-            </div>
-          </div>
-          <button class="iconbtn" aria-label="Bearbeiten">✎</button>
-        </div>`;
-      }).join("");
+  listEl.querySelectorAll(".card").forEach(card=>{
+    const id = card.getAttribute("data-id");
+    const favBtn = card.querySelector(".iconbtn");
 
-      listEl.querySelectorAll(".card").forEach(card=>{
-        const id = card.getAttribute("data-tr");
-        const open = ()=>openTraining(id);
-        card.addEventListener("click", open);
-        card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
-        card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); open(); });
-      });
-    }
-
-    function render(){
-      renderChips();
-      if(activeTab==="trainings") renderTrainings();
-      else renderExercises();
-    }
-
-    function toggleFav(id){
-      if(favorites.has(id)) favorites.delete(id);
-      else favorites.add(id);
-      saveJSON(LS.fav, Array.from(favorites));
-    }
-
-    /* =========================
-       Exercise Modal
-       ========================= */
-    let currentExercise = null;
-
-    function openExercise(id){
-      const ex = EXERCISES.find(x=>x.id===id);
-      if(!ex) return;
-      currentExercise = ex;
-
-      $("exTitle").textContent = ex.title;
-      $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(ex.category)}</span>
-        <span class="pill">🖼 ${(ex.screenshots||[]).length} Bild${(ex.screenshots||[]).length===1?"":"er"}</span>`;
-      $("exFavBtn").textContent = favorites.has(ex.id) ? "★ Favorit" : "☆ Favorit";
-      $("exNotes").value = notesById[ex.id] || "";
-      $("exErr").style.display="none";
-
-      const shots = ex.screenshots || [];
-      $("exPreview").innerHTML = shots.length
-        ? shots.map(src=>`<img src="${escapeHTML(src)}" alt="preview">`).join("")
-        : `<div class="empty">Keine Screenshots hinterlegt.</div>`;
-
-      $("exBack").setAttribute("data-open","1");
-      $("exBack").setAttribute("aria-hidden","false");
-    }
-    function closeExercise(){
-      $("exBack").setAttribute("data-open","0");
-      $("exBack").setAttribute("aria-hidden","true");
-      currentExercise = null;
-    }
-
-    $("exClose").addEventListener("click", closeExercise);
-    $("exBack").addEventListener("click",(e)=>{ if(e.target===$("exBack")) closeExercise(); });
-
-    $("exFavBtn").addEventListener("click", ()=>{
-      if(!currentExercise) return;
-      toggleFav(currentExercise.id);
-      $("exFavBtn").textContent = favorites.has(currentExercise.id) ? "★ Favorit" : "☆ Favorit";
+    favBtn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      toggleFav(id);
       render();
     });
 
-    $("exOpenShots").addEventListener("click", ()=>{
-      if(!currentExercise) return;
-      (currentExercise.screenshots||[]).forEach(src=>window.open(src,"_blank","noopener,noreferrer"));
-    });
+    const open = ()=>openExercise(id);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+  });
+}
 
-    $("exSaveNotes").addEventListener("click", ()=>{
-      if(!currentExercise) return;
-      notesById[currentExercise.id] = $("exNotes").value || "";
-      saveJSON(LS.notes, notesById);
-      alert("Notizen gespeichert ✅");
-    });
+function renderTrainings(){
+  if(!trainings.length){
+    listEl.innerHTML = `<div class="empty">Noch kein Training. Tippe oben auf <b>+ Training</b>.</div>`;
+    return;
+  }
+  const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  listEl.innerHTML = sorted.map(tr=>{
+    const n = (tr.items||[]).length;
+    return `<div class="card" data-tr="${escapeHTML(tr.id)}" role="button" tabindex="0">
+      <div class="thumb"><div class="ph">TR</div></div>
+      <div class="meta">
+        <p class="t">${escapeHTML(tr.name)}</p>
+        <div class="s">
+          <span class="pill">🧩 ${n} Übung${n===1?"":"en"}</span>
+          <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||tr.createdAt||Date.now()).toLocaleString())}</span>
+        </div>
+      </div>
+      <button class="iconbtn" aria-label="Bearbeiten">✎</button>
+    </div>`;
+  }).join("");
 
-    $("exEditCat").addEventListener("click", ()=>{
-  if(!CURRENT) return;
+  listEl.querySelectorAll(".card").forEach(card=>{
+    const id = card.getAttribute("data-tr");
+    const open = ()=>openTraining(id);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+    card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); open(); });
+  });
+}
+
+function render(){
+  renderChips();
+  if(activeTab==="trainings") renderTrainings();
+  else renderExercises();
+}
+
+function toggleFav(id){
+  if(favorites.has(id)) favorites.delete(id);
+  else favorites.add(id);
+  saveJSON(LS.fav, Array.from(favorites));
+}
+
+/* =========================
+   Exercise Modal
+========================= */
+let currentExercise = null;
+
+function openExercise(id){
+  const ex = EXERCISES.find(x=>x.id===id);
+  if(!ex) return;
+  currentExercise = ex;
+
+  $("exTitle").textContent = ex.title;
+  $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+    <span class="pill">🖼 ${(ex.screenshots||[]).length} Bild${(ex.screenshots||[]).length===1?"":"er"}</span>`;
+  $("exFavBtn").textContent = favorites.has(ex.id) ? "★ Favorit" : "☆ Favorit";
+  $("exNotes").value = notesById[ex.id] || "";
+  $("exErr").style.display="none";
+
+  const shots = ex.screenshots || [];
+  $("exPreview").innerHTML = shots.length
+    ? shots.map(src=>`<img src="${escapeHTML(src)}" alt="preview">`).join("")
+    : `<div class="empty">Keine Screenshots hinterlegt.</div>`;
+
+  $("exBack").setAttribute("data-open","1");
+  $("exBack").setAttribute("aria-hidden","false");
+}
+function closeExercise(){
+  $("exBack").setAttribute("data-open","0");
+  $("exBack").setAttribute("aria-hidden","true");
+  currentExercise = null;
+}
+
+$("exClose").addEventListener("click", closeExercise);
+$("exBack").addEventListener("click",(e)=>{ if(e.target===$("exBack")) closeExercise(); });
+
+$("exFavBtn").addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  toggleFav(currentExercise.id);
+  $("exFavBtn").textContent = favorites.has(currentExercise.id) ? "★ Favorit" : "☆ Favorit";
+  render();
+});
+
+$("exOpenShots").addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  (currentExercise.screenshots||[]).forEach(src=>window.open(src,"_blank","noopener,noreferrer"));
+});
+
+$("exSaveNotes").addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  notesById[currentExercise.id] = $("exNotes").value || "";
+  saveJSON(LS.notes, notesById);
+  alert("Notizen gespeichert ✅");
+});
+
+$("exEditCat").addEventListener("click", ()=>{
+  if(!currentExercise) return;
 
   const next = prompt(
     "Neue Kategorie:\n\n" + CATEGORIES.join("\n"),
-    CURRENT.category
+    currentExercise.category
   );
 
   if(!next) return;
 
-  setExerciseCategory(CURRENT, next.trim());
+  setExerciseCategory(currentExercise, next);
+  $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(currentExercise.category)}</span>
+    <span class="pill">🖼 ${(currentExercise.screenshots||[]).length} Bild${(currentExercise.screenshots||[]).length===1?"":"er"}</span>`;
+
+  EXERCISES.sort((a,b)=>{
+    const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+    const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+    return c !== 0 ? c : a.title.localeCompare(b.title);
+  });
+
   render();
 });
 
-    $("exEditCat").addEventListener("click", ()=>{
-      if(!currentExercise) return;
-      const cur = currentExercise.category;
-      const pick = prompt(
-        "Neue Kategorie (genau so schreiben):\n\n" + CATEGORIES.join("\n") + "\n\nAktuell: " + cur,
-        cur
-      );
-      if(!pick) return;
-      const p = pick.trim();
-      if(!CATEGORIES.includes(p)){
-        $("exErr").textContent = "Kategorie ungültig. Bitte exakt eine der Kategorien eingeben.";
-        $("exErr").style.display="block";
-        return;
-      }
-      catOverrides[currentExercise.id] = p;
-      saveJSON(LS.catOverrides, catOverrides);
-      currentExercise.category = p;
-      $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(p)}</span>
-        <span class="pill">🖼 ${(currentExercise.screenshots||[]).length} Bilder</span>`;
-      $("exErr").style.display="none";
-      // resort
-      EXERCISES.sort((a,b)=>{
-        const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
-        const c = (ca===-1?999:ca) - (cb===-1?999:cb);
-        return c !== 0 ? c : a.title.localeCompare(b.title);
-      });
-      render();
-    });
+/* =========================
+   Add to Training
+========================= */
+let addExercise = null;
 
-    /* =========================
-       Add to Training
-       ========================= */
-    let addExercise = null;
+$("exAddBtn").addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  addExercise = currentExercise;
+  $("addMeta").innerHTML = `<span class="pill">➕ ${escapeHTML(addExercise.title)}</span>`;
+  renderAddList();
+  $("addBack").setAttribute("data-open","1");
+  $("addBack").setAttribute("aria-hidden","false");
+});
 
-    $("exAddBtn").addEventListener("click", ()=>{
-      if(!currentExercise) return;
-      addExercise = currentExercise;
-      $("addMeta").innerHTML = `<span class="pill">➕ ${escapeHTML(addExercise.title)}</span>`;
-      renderAddList();
-      $("addBack").setAttribute("data-open","1");
-      $("addBack").setAttribute("aria-hidden","false");
-    });
+function closeAdd(){
+  $("addBack").setAttribute("data-open","0");
+  $("addBack").setAttribute("aria-hidden","true");
+  addExercise = null;
+}
 
-    function closeAdd(){
-      $("addBack").setAttribute("data-open","0");
-      $("addBack").setAttribute("aria-hidden","true");
-      addExercise = null;
-    }
+$("addClose").addEventListener("click", closeAdd);
+$("addBack").addEventListener("click",(e)=>{ if(e.target===$("addBack")) closeAdd(); });
 
-    $("addClose").addEventListener("click", closeAdd);
-    $("addBack").addEventListener("click",(e)=>{ if(e.target===$("addBack")) closeAdd(); });
+function renderAddList(){
+  const el = $("addList");
+  if(!trainings.length){
+    el.innerHTML = `<div class="empty">Noch kein Training. Tippe „+ Neues Training“.</div>`;
+    return;
+  }
+  const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  el.innerHTML = sorted.map(tr=>{
+    return `<div class="card" data-tr="${escapeHTML(tr.id)}">
+      <div class="thumb"><div class="ph">TR</div></div>
+      <div class="meta">
+        <p class="t">${escapeHTML(tr.name)}</p>
+        <div class="s"><span class="pill">🧩 ${(tr.items||[]).length} Übungen</span></div>
+      </div>
+      <button class="iconbtn">＋</button>
+    </div>`;
+  }).join("");
 
-    function renderAddList(){
-      const el = $("addList");
-      if(!trainings.length){
-        el.innerHTML = `<div class="empty">Noch kein Training. Tippe „+ Neues Training“.</div>`;
-        return;
-      }
-      const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-      el.innerHTML = sorted.map(tr=>{
-        return `<div class="card" data-tr="${escapeHTML(tr.id)}">
-          <div class="thumb"><div class="ph">TR</div></div>
-          <div class="meta">
-            <p class="t">${escapeHTML(tr.name)}</p>
-            <div class="s"><span class="pill">🧩 ${(tr.items||[]).length} Übungen</span></div>
-          </div>
-          <button class="iconbtn">＋</button>
-        </div>`;
-      }).join("");
-
-      el.querySelectorAll(".card").forEach(card=>{
-        const trId = card.getAttribute("data-tr");
-        const addIt = ()=>{
-          addExerciseToTraining(trId, addExercise.id);
-          alert("Hinzugefügt ✅");
-          renderAddList();
-          render();
-        };
-        card.addEventListener("click", addIt);
-        card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); addIt(); });
-      });
-    }
-
-    $("addCreate").addEventListener("click", ()=>{
-      const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
-      if(!name) return;
-      const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
-      trainings = [tr, ...trainings];
-      saveJSON(LS.trainings, trainings);
+  el.querySelectorAll(".card").forEach(card=>{
+    const trId = card.getAttribute("data-tr");
+    const addIt = ()=>{
+      addExerciseToTraining(trId, addExercise.id);
+      alert("Hinzugefügt ✅");
       renderAddList();
       render();
-    });
+    };
+    card.addEventListener("click", addIt);
+    card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); addIt(); });
+  });
+}
 
-    function addExerciseToTraining(trainingId, exerciseId){
-      const idx = trainings.findIndex(t=>t.id===trainingId);
-      if(idx<0) return;
-      const tr = trainings[idx];
-      tr.items = tr.items || [];
-      tr.items.push({ exerciseId, addedAt: Date.now() });
-      tr.updatedAt = Date.now();
-      trainings[idx]=tr;
-      saveJSON(LS.trainings, trainings);
-    }
+$("addCreate").addEventListener("click", ()=>{
+  const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
+  if(!name) return;
+  const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+  trainings = [tr, ...trainings];
+  saveJSON(LS.trainings, trainings);
+  renderAddList();
+  render();
+});
 
-    /* =========================
-       Training CRUD + Editor
-       ========================= */
-    $("btnNewTraining").addEventListener("click", ()=>{
-      const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
-      if(!name) return;
-      const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
-      trainings = [tr, ...trainings];
-      saveJSON(LS.trainings, trainings);
-      setTab("trainings");
-    });
+function addExerciseToTraining(trainingId, exerciseId){
+  const idx = trainings.findIndex(t=>t.id===trainingId);
+  if(idx<0) return;
+  const tr = trainings[idx];
+  tr.items = tr.items || [];
+  tr.items.push({ exerciseId, addedAt: Date.now() });
+  tr.updatedAt = Date.now();
+  trainings[idx]=tr;
+  saveJSON(LS.trainings, trainings);
+}
 
-    let currentTrainingId = null;
+/* =========================
+   Training CRUD + Editor
+========================= */
+$("btnNewTraining").addEventListener("click", ()=>{
+  const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
+  if(!name) return;
+  const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+  trainings = [tr, ...trainings];
+  saveJSON(LS.trainings, trainings);
+  setTab("trainings");
+});
 
-    function openTraining(id){
-      const tr = trainings.find(t=>t.id===id);
-      if(!tr) return;
-      currentTrainingId = id;
-      $("trTitle").textContent = tr.name;
-      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
-        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
-      renderTrainingList();
-      $("trBack").setAttribute("data-open","1");
-      $("trBack").setAttribute("aria-hidden","false");
-    }
+let currentTrainingId = null;
 
-    function closeTraining(){
-      $("trBack").setAttribute("data-open","0");
-      $("trBack").setAttribute("aria-hidden","true");
-      currentTrainingId = null;
-    }
+function openTraining(id){
+  const tr = trainings.find(t=>t.id===id);
+  if(!tr) return;
+  currentTrainingId = id;
+  $("trTitle").textContent = tr.name;
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+  renderTrainingList();
+  $("trBack").setAttribute("data-open","1");
+  $("trBack").setAttribute("aria-hidden","false");
+}
 
-    $("trClose").addEventListener("click", closeTraining);
-    $("trBack").addEventListener("click",(e)=>{ if(e.target===$("trBack")) closeTraining(); });
+function closeTraining(){
+  $("trBack").setAttribute("data-open","0");
+  $("trBack").setAttribute("aria-hidden","true");
+  currentTrainingId = null;
+}
 
-    function renderTrainingList(){
-      const tr = trainings.find(t=>t.id===currentTrainingId);
-      if(!tr) return;
-      const items = tr.items || [];
-      const list = $("trList");
-      const empty = $("trEmpty");
-      if(!items.length){
-        empty.style.display="block";
-        list.innerHTML="";
-        return;
-      }
-      empty.style.display="none";
+$("trClose").addEventListener("click", closeTraining);
+$("trBack").addEventListener("click",(e)=>{ if(e.target===$("trBack")) closeTraining(); });
 
-      list.innerHTML = items.map((it, idx)=>{
-        const ex = EXERCISES.find(e=>e.id===it.exerciseId);
-        const title = ex ? ex.title : ("Unbekannt: " + it.exerciseId);
-        const cat = ex ? ex.category : "—";
-        const sc = ex?.screenshots?.length || 0;
-        const thumb = ex?.screenshots?.[0] || "";
-        return `<div class="card" data-idx="${idx}">
-          <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="p">` : `<div class="ph">—</div>`}</div>
-          <div class="meta">
-            <p class="t">${escapeHTML(title)}</p>
-            <div class="s">
-              <span class="pill">🏷 ${escapeHTML(cat)}</span>
-              <span class="pill">🖼 ${sc}</span>
-            </div>
-          </div>
-          <div style="display:flex;gap:6px;flex:0 0 auto">
-            <button class="iconbtn" data-act="up">▲</button>
-            <button class="iconbtn" data-act="down">▼</button>
-            <button class="iconbtn" data-act="rm">✕</button>
-          </div>
-        </div>`;
-      }).join("");
+function renderTrainingList(){
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
+  const items = tr.items || [];
+  const list = $("trList");
+  const empty = $("trEmpty");
 
-      list.querySelectorAll(".card").forEach(card=>{
-        const idx = Number(card.getAttribute("data-idx"));
-        card.querySelectorAll(".iconbtn").forEach(b=>{
-          b.addEventListener("click",(e)=>{
-            e.stopPropagation();
-            trainingAction(b.getAttribute("data-act"), idx);
-          });
-        });
-        card.addEventListener("click", ()=>{
-          const t = trainings.find(x=>x.id===currentTrainingId);
-          const exId = (t.items||[])[idx]?.exerciseId;
-          if(exId) openExercise(exId);
-        });
+  if(!items.length){
+    empty.style.display="block";
+    list.innerHTML="";
+    return;
+  }
+  empty.style.display="none";
+
+  list.innerHTML = items.map((it, idx)=>{
+    const ex = EXERCISES.find(e=>e.id===it.exerciseId);
+    const title = ex ? ex.title : ("Unbekannt: " + it.exerciseId);
+    const cat = ex ? ex.category : "—";
+    const sc = ex?.screenshots?.length || 0;
+    const thumb = ex?.screenshots?.[0] || "";
+    return `<div class="card" data-idx="${idx}">
+      <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="p">` : `<div class="ph">—</div>`}</div>
+      <div class="meta">
+        <p class="t">${escapeHTML(title)}</p>
+        <div class="s">
+          <span class="pill">🏷 ${escapeHTML(cat)}</span>
+          <span class="pill">🖼 ${sc}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex:0 0 auto">
+        <button class="iconbtn" data-act="up">▲</button>
+        <button class="iconbtn" data-act="down">▼</button>
+        <button class="iconbtn" data-act="rm">✕</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".card").forEach(card=>{
+    const idx = Number(card.getAttribute("data-idx"));
+    card.querySelectorAll(".iconbtn").forEach(b=>{
+      b.addEventListener("click",(e)=>{
+        e.stopPropagation();
+        trainingAction(b.getAttribute("data-act"), idx);
       });
-    }
-
-    function trainingAction(act, idx){
-      const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
-      if(tIdx<0) return;
-      const tr = trainings[tIdx];
-      tr.items = tr.items || [];
-      if(act==="rm") tr.items.splice(idx,1);
-      if(act==="up" && idx>0){ const tmp=tr.items[idx-1]; tr.items[idx-1]=tr.items[idx]; tr.items[idx]=tmp; }
-      if(act==="down" && idx<tr.items.length-1){ const tmp=tr.items[idx+1]; tr.items[idx+1]=tr.items[idx]; tr.items[idx]=tmp; }
-      tr.updatedAt = Date.now();
-      trainings[tIdx]=tr;
-      saveJSON(LS.trainings, trainings);
-      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
-        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
-      renderTrainingList();
-      render();
-    }
-
-    $("trRename").addEventListener("click", ()=>{
-      const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
-      if(tIdx<0) return;
-      const tr = trainings[tIdx];
-      const name = prompt("Neuer Name:", tr.name);
-      if(!name) return;
-      tr.name = name.trim();
-      tr.updatedAt = Date.now();
-      trainings[tIdx]=tr;
-      saveJSON(LS.trainings, trainings);
-      $("trTitle").textContent = tr.name;
-      $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
-        <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
-      render();
     });
-
-    $("trDuplicate").addEventListener("click", ()=>{
-      const tr = trainings.find(t=>t.id===currentTrainingId);
-      if(!tr) return;
-      const copy = {
-        id: nowId(),
-        name: tr.name + " (Kopie)",
-        items: (tr.items||[]).map(x=>({ ...x })),
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-      trainings = [copy, ...trainings];
-      saveJSON(LS.trainings, trainings);
-      alert("Dupliziert ✅");
-      openTraining(copy.id);
-      render();
+    card.addEventListener("click", ()=>{
+      const t = trainings.find(x=>x.id===currentTrainingId);
+      const exId = (t.items||[])[idx]?.exerciseId;
+      if(exId) openExercise(exId);
     });
+  });
+}
 
-    $("trDelete").addEventListener("click", ()=>{
-      const tr = trainings.find(t=>t.id===currentTrainingId);
-      if(!tr) return;
-      if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
-      trainings = trainings.filter(t=>t.id!==currentTrainingId);
-      saveJSON(LS.trainings, trainings);
-      closeTraining();
-      render();
-    });
+function trainingAction(act, idx){
+  const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+  if(tIdx<0) return;
+  const tr = trainings[tIdx];
+  tr.items = tr.items || [];
+  if(act==="rm") tr.items.splice(idx,1);
+  if(act==="up" && idx>0){ const tmp=tr.items[idx-1]; tr.items[idx-1]=tr.items[idx]; tr.items[idx]=tmp; }
+  if(act==="down" && idx<tr.items.length-1){ const tmp=tr.items[idx+1]; tr.items[idx+1]=tr.items[idx]; tr.items[idx]=tmp; }
+  tr.updatedAt = Date.now();
+  trainings[tIdx]=tr;
+  saveJSON(LS.trainings, trainings);
 
-    /* =========================
-       PDF Export (jsPDF)
-       ========================= */
-    async function ensureJsPdf(){
-      if(window.jspdf && window.jspdf.jsPDF) return;
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
 
-      // CDN first
-      await new Promise((resolve)=>{
-        const s=document.createElement("script");
-        s.src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
-        s.onload=resolve; s.onerror=resolve;
-        document.head.appendChild(s);
-      });
-      if(window.jspdf && window.jspdf.jsPDF) return;
+  renderTrainingList();
+  render();
+}
 
-      // local fallback: assets/libs/jspdf.umd.min.js
-      await new Promise((resolve)=>{
-        const s=document.createElement("script");
-        s.src="assets/libs/jspdf.umd.min.js";
-        s.onload=resolve; s.onerror=resolve;
-        document.head.appendChild(s);
-      });
-      if(!(window.jspdf && window.jspdf.jsPDF)){
-        throw new Error("jsPDF konnte nicht geladen werden. (Kein Internet + keine assets/libs/jspdf.umd.min.js)");
-      }
-    }
+$("trRename").addEventListener("click", ()=>{
+  const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+  if(tIdx<0) return;
+  const tr = trainings[tIdx];
+  const name = prompt("Neuer Name:", tr.name);
+  if(!name) return;
+  tr.name = name.trim();
+  tr.updatedAt = Date.now();
+  trainings[tIdx]=tr;
+  saveJSON(LS.trainings, trainings);
+  $("trTitle").textContent = tr.name;
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+  render();
+});
 
-    async function fetchAsDataUrl(url){
-      const res = await fetch(url, { cache:"no-cache" });
-      if(!res.ok) throw new Error("Fehlendes Bild: " + url);
-      const blob = await res.blob();
-      return await new Promise((resolve,reject)=>{
-        const r = new FileReader();
-        r.onload = ()=>resolve(r.result);
-        r.onerror = reject;
-        r.readAsDataURL(blob);
-      });
-    }
+$("trDuplicate").addEventListener("click", ()=>{
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
+  const copy = {
+    id: nowId(),
+    name: tr.name + " (Kopie)",
+    items: (tr.items||[]).map(x=>({ ...x })),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
+  trainings = [copy, ...trainings];
+  saveJSON(LS.trainings, trainings);
+  alert("Dupliziert ✅");
+  openTraining(copy.id);
+  render();
+});
 
-    $("trExportPdf").addEventListener("click", async ()=>{
-      const tr = trainings.find(t=>t.id===currentTrainingId);
-      if(!tr) return;
+$("trDelete").addEventListener("click", ()=>{
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
+  if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
+  trainings = trainings.filter(t=>t.id!==currentTrainingId);
+  saveJSON(LS.trainings, trainings);
+  closeTraining();
+  render();
+});
 
-      try{ await ensureJsPdf(); }catch(e){ alert("PDF Export nicht möglich: " + e.message); return; }
-      const { jsPDF } = window.jspdf;
+/* =========================
+   PDF Export (jsPDF)
+========================= */
+async function ensureJsPdf(){
+  if(window.jspdf && window.jspdf.jsPDF) return;
 
-      const doc = new jsPDF({ unit:"mm", format:"a4", compress:true });
-      const pageW = doc.internal.pageSize.getWidth();
-      const pageH = doc.internal.pageSize.getHeight();
-      const margin = 12;
-      const maxW = pageW - margin*2;
+  await new Promise((resolve)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+    s.onload=resolve; s.onerror=resolve;
+    document.head.appendChild(s);
+  });
+  if(window.jspdf && window.jspdf.jsPDF) return;
 
-      let y = margin;
+  await new Promise((resolve)=>{
+    const s=document.createElement("script");
+    s.src="assets/libs/jspdf.umd.min.js";
+    s.onload=resolve; s.onerror=resolve;
+    document.head.appendChild(s);
+  });
 
-      doc.setFont("helvetica","bold");
-      doc.setFontSize(18);
-      doc.text(tr.name, margin, y);
-      y += 8;
+  if(!(window.jspdf && window.jspdf.jsPDF)){
+    throw new Error("jsPDF konnte nicht geladen werden. (Kein Internet + keine assets/libs/jspdf.umd.min.js)");
+  }
+}
 
+async function fetchAsDataUrl(url){
+  const res = await fetch(url, { cache:"no-cache" });
+  if(!res.ok) throw new Error("Fehlendes Bild: " + url);
+  const blob = await res.blob();
+  return await new Promise((resolve,reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
+
+$("trExportPdf").addEventListener("click", async ()=>{
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
+
+  try{ await ensureJsPdf(); }catch(e){ alert("PDF Export nicht möglich: " + e.message); return; }
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({ unit:"mm", format:"a4", compress:true });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 12;
+  const maxW = pageW - margin*2;
+
+  let y = margin;
+
+  doc.setFont("helvetica","bold");
+  doc.setFontSize(18);
+  doc.text(tr.name, margin, y);
+  y += 8;
+
+  doc.setFont("helvetica","normal");
+  doc.setFontSize(11);
+  doc.text("Exportiert: " + new Date().toLocaleString(), margin, y);
+  y += 10;
+
+  const items = tr.items || [];
+
+  for(let i=0;i<items.length;i++){
+    const ex = EXERCISES.find(e=>e.id===items[i].exerciseId);
+    if(!ex) continue;
+
+    doc.setFont("helvetica","bold");
+    doc.setFontSize(14);
+    const heading = `${i+1}. ${ex.title}  (${ex.category})`;
+    const headLines = doc.splitTextToSize(heading, maxW);
+    if(y + headLines.length*6 > pageH - margin){ doc.addPage(); y = margin; }
+    doc.text(headLines, margin, y);
+    y += headLines.length*6 + 2;
+
+    const note = (notesById[ex.id] || "").trim();
+    if(note){
       doc.setFont("helvetica","normal");
       doc.setFontSize(11);
-      doc.text("Exportiert: " + new Date().toLocaleString(), margin, y);
-      y += 10;
+      const nLines = doc.splitTextToSize("Notizen: " + note, maxW);
+      if(y + nLines.length*5 > pageH - margin){ doc.addPage(); y = margin; }
+      doc.text(nLines, margin, y);
+      y += nLines.length*5 + 3;
+    }
 
-      const items = tr.items || [];
+    const shots = (ex.screenshots||[]).slice();
+    shots.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
 
-      for(let i=0;i<items.length;i++){
-        const ex = EXERCISES.find(e=>e.id===items[i].exerciseId);
-        if(!ex) continue;
-
-        // section title
-        doc.setFont("helvetica","bold");
-        doc.setFontSize(14);
-        const heading = `${i+1}. ${ex.title}  (${ex.category})`;
-        const headLines = doc.splitTextToSize(heading, maxW);
-        if(y + headLines.length*6 > pageH - margin){ doc.addPage(); y = margin; }
-        doc.text(headLines, margin, y);
-        y += headLines.length*6 + 2;
-
-        // notes
-        const note = (notesById[ex.id] || "").trim();
-        if(note){
-          doc.setFont("helvetica","normal");
-          doc.setFontSize(11);
-          const nLines = doc.splitTextToSize("Notizen: " + note, maxW);
-          if(y + nLines.length*5 > pageH - margin){ doc.addPage(); y = margin; }
-          doc.text(nLines, margin, y);
-          y += nLines.length*5 + 3;
-        }
-
-        // screenshots
-        const shots = (ex.screenshots||[]).slice();
-        shots.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
-
-        for(const shotUrl of shots){
-          let dataUrl;
-          try{
-            dataUrl = await fetchAsDataUrl(shotUrl);
-          }catch(err){
-            doc.setTextColor(200, 60, 80);
-            const t = doc.splitTextToSize("Bild fehlt: " + shotUrl, maxW);
-            if(y + t.length*5 > pageH - margin){ doc.addPage(); y = margin; }
-            doc.text(t, margin, y);
-            doc.setTextColor(0,0,0);
-            y += t.length*5 + 4;
-            continue;
-          }
-
-          const dims = await new Promise((resolve)=>{
-            const img = new Image();
-            img.onload = ()=>resolve({ w: img.naturalWidth, h: img.naturalHeight });
-            img.onerror = ()=>resolve({ w: 1200, h: 800 });
-            img.src = dataUrl;
-          });
-
-          const ratio = dims.h / dims.w;
-          const drawH = maxW * ratio;
-
-          if(y + drawH > pageH - margin){
-            doc.addPage();
-            y = margin;
-          }
-
-          const imgType = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
-          doc.addImage(dataUrl, imgType, margin, y, maxW, drawH, undefined, "FAST");
-          y += drawH + 6;
-        }
-
-        // separator line
-        if(i < items.length - 1){
-          if(y + 6 > pageH - margin){ doc.addPage(); y = margin; }
-          doc.setDrawColor(210,210,210);
-          doc.line(margin, y, pageW - margin, y);
-          y += 8;
-        }
+    for(const shotUrl of shots){
+      let dataUrl;
+      try{ dataUrl = await fetchAsDataUrl(shotUrl); }
+      catch(err){
+        doc.setTextColor(200, 60, 80);
+        const t = doc.splitTextToSize("Bild fehlt: " + shotUrl, maxW);
+        if(y + t.length*5 > pageH - margin){ doc.addPage(); y = margin; }
+        doc.text(t, margin, y);
+        doc.setTextColor(0,0,0);
+        y += t.length*5 + 4;
+        continue;
       }
 
-      const safe = (tr.name || "Training").replace(/[\/\\?%*:|"<>]/g,"-").trim();
-      doc.save(safe + ".pdf");
-    });
+      const dims = await new Promise((resolve)=>{
+        const img = new Image();
+        img.onload = ()=>resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = ()=>resolve({ w: 1200, h: 800 });
+        img.src = dataUrl;
+      });
 
-    /* =========================
-       Data export (also helps you create manifest.json for GitHub Pages)
-       ========================= */
-    $("btnExportData").addEventListener("click", ()=>{
-      const manifest = { files: EXERCISES.flatMap(e => e.screenshots.map(s => s.replace(/^assets\/previews\//,""))) };
-      const payload = {
-        exportedAt: Date.now(),
-        info: "Lege manifest.json in assets/previews/ ab, damit GitHub Pages alle Bilder findet.",
-        manifest_json_to_save_as: "assets/previews/manifest.json",
-        manifest,
-        state: {
-          selectedCats,
-          favorites: Array.from(favorites),
-          notesById,
-          trainings,
-          catOverrides
-        }
-      };
-      const json = JSON.stringify(payload, null, 2);
-      const blob = new Blob([json], { type:"application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "coach-app-data-and-manifest.json";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      const ratio = dims.h / dims.w;
+      const drawH = maxW * ratio;
 
-      alert("Export erstellt ✅\n\nTipp: Öffne die JSON und kopiere den 'manifest' Block als assets/previews/manifest.json für GitHub Pages.");
-    });
+      if(y + drawH > pageH - margin){
+        doc.addPage();
+        y = margin;
+      }
 
-    $("btnReset").addEventListener("click", ()=>{
-      if(!confirm("Wirklich alles zurücksetzen? (Favoriten, Trainings, Notizen)")) return;
-      localStorage.removeItem(LS.tab);
-      localStorage.removeItem(LS.cats);
-      localStorage.removeItem(LS.fav);
-      localStorage.removeItem(LS.notes);
-      localStorage.removeItem(LS.trainings);
-      localStorage.removeItem(LS.catOverrides);
-      localStorage.removeItem(LS.manifestCache);
-      location.reload();
-    });
-    document.getElementById("btnOcr").addEventListener("click", async ()=>{
+      const imgType = dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+      doc.addImage(dataUrl, imgType, margin, y, maxW, drawH, undefined, "FAST");
+      y += drawH + 6;
+    }
+
+    if(i < items.length - 1){
+      if(y + 6 > pageH - margin){ doc.addPage(); y = margin; }
+      doc.setDrawColor(210,210,210);
+      doc.line(margin, y, pageW - margin, y);
+      y += 8;
+    }
+  }
+
+  const safe = (tr.name || "Training").replace(/[\/\\?%*:|"<>]/g,"-").trim();
+  doc.save(safe + ".pdf");
+});
+
+/* =========================
+   Data export
+========================= */
+$("btnExportData").addEventListener("click", ()=>{
+  const manifest = {
+    files: EXERCISES.flatMap(e => (e.screenshots||[]).map(s => s.replace(/^assets\/previews\//,"")))
+  };
+
+  const payload = {
+    exportedAt: Date.now(),
+    manifest_json_to_save_as: "assets/manifest.json (oder assets/previews/manifest.json)",
+    manifest,
+    state: {
+      selectedCats,
+      favorites: Array.from(favorites),
+      notesById,
+      trainings,
+      catOverrides
+    }
+  };
+
+  const json = JSON.stringify(payload, null, 2);
+  const blob = new Blob([json], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "coach-app-data-and-manifest.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  alert("Export erstellt ✅\n\nTipp: Kopiere den 'manifest' Block in eine Datei:\nassets/manifest.json (oder assets/previews/manifest.json).");
+});
+
+/* =========================
+   Reset + OCR Button
+========================= */
+$("btnReset").addEventListener("click", ()=>{
+  if(!confirm("Wirklich alles zurücksetzen? (Favoriten, Trainings, Notizen, Overrides)")) return;
+  localStorage.removeItem(LS.tab);
+  localStorage.removeItem(LS.cats);
+  localStorage.removeItem(LS.fav);
+  localStorage.removeItem(LS.notes);
+  localStorage.removeItem(LS.trainings);
+  localStorage.removeItem(LS.catOverrides);
+  localStorage.removeItem(LS.manifestCache);
+  location.reload();
+});
+
+$("btnOcr").addEventListener("click", async ()=>{
   alert("OCR startet. Das dauert einmalig.");
-
   await buildOcrIndex(EXERCISES);
-
   alert("OCR fertig – Suche kann jetzt Text aus Bildern.");
   render();
 });
 
-    /* =========================
-       Tabs, Search, Shortcuts
-       ========================= */
-    $("tabExercises").addEventListener("click", ()=>setTab("exercises"));
-    $("tabTrainings").addEventListener("click", ()=>setTab("trainings"));
-    $("tabFavs").addEventListener("click", ()=>setTab("favs"));
+/* =========================
+   Tabs, Search, Shortcuts
+========================= */
+$("tabExercises").addEventListener("click", ()=>setTab("exercises"));
+$("tabTrainings").addEventListener("click", ()=>setTab("trainings"));
+$("tabFavs").addEventListener("click", ()=>setTab("favs"));
 
-    let sd=null;
-    searchEl.addEventListener("input", ()=>{ clearTimeout(sd); sd=setTimeout(render, 120); });
+let sd=null;
+searchEl.addEventListener("input", ()=>{ clearTimeout(sd); sd=setTimeout(render, 120); });
 
-    document.addEventListener("keydown",(e)=>{
-      if(e.key==="Escape"){
-        closeExercise();
-        closeAdd();
-        closeTraining();
-      }
-    });
-
-    /* =========================
-       Boot
-       ========================= */
-    (async function boot(){
-      // persist current state (in case first run)
-      saveJSON(LS.tab, activeTab);
-      saveJSON(LS.cats, selectedCats);
-      saveJSON(LS.fav, Array.from(favorites));
-      saveJSON(LS.notes, notesById);
-      saveJSON(LS.trainings, trainings);
-      saveJSON(LS.catOverrides, catOverrides);
-      
-      try{
-  const r = await fetch("assets/catOverrides.json", { cache:"no-store" });
-  if(r.ok){
-    catOverrides = await r.json();
-    saveJSON(LS.catOverrides, catOverrides); // optional, schreibt es auch in localStorage
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Escape"){
+    closeExercise();
+    closeAdd();
+    closeTraining();
   }
-}catch(e){}
+});
 
-      await loadAllExercises();
-      applyCategoryOverrides();
+/* =========================
+   Boot
+========================= */
+(async function boot(){
+  // persist current state
+  saveJSON(LS.tab, activeTab);
+  saveJSON(LS.cats, selectedCats);
+  saveJSON(LS.fav, Array.from(favorites));
+  saveJSON(LS.notes, notesById);
+  saveJSON(LS.trainings, trainings);
+  saveJSON(LS.catOverrides, catOverrides);
 
-      // gentle warning if some filenames still contain uppercase/spaces (will still work locally but better normalized)
-      const bad = EXERCISES.flatMap(e=>e.screenshots.map(s=>s.replace(/^assets\/previews\//,"")))
-        .filter(f=>/[A-Z ]/.test(f));
-     
+  await loadAllExercises();
 
-      renderChips();
-      setTab(activeTab);
-    })();
-  </script>
+  renderChips();
+  setTab(activeTab);
+})();
+</script>
 </body>
 </html>
