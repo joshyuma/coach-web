@@ -938,7 +938,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "CLOSEOUTS";
 
   // Finishing
-  if(/finish|finishes|blind cut|1 on 1 surpise hand off|four spots|rim|chase|perceptual|poster|posters|guided series|1 on 1 hi|touchdown/.test(s))
+  if(/finish|finishes|blind cut|1 on 1 surprise hand off|four spots|rim|chase|perceptual|poster|posters|guided series|1 on 1 hi|touchdown/.test(s))
     return "FINISHING";
 
   // Shooting
@@ -950,7 +950,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "DRIBBLING";
 
   // Defense
-  if(/defen|7 seconds|defense|protect the rim|mirror game|seven seconds|chest blows|close the gate|lane turns|protect he paint|open and chasesurprise\b/.test(s))
+  if(/defen|7 seconds|defense|protect the rim|mirror game|seven seconds|chest blows|close the gate|lane turns|protect he paint|open and chase/.test(s))
     return "DEFENSE";
 
   // Passing
@@ -974,7 +974,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "PICK AND ROLL";
 
   // Team Dev Mix (ADV / Advantage usw)
-  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|4 on 5|6 on 5|zone|ppp scoring|scramble|fortnite|battleship|cambio|team scoring system|surpise game|floor is lava/.test(s))
+  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|4 on 5|6 on 5|zone|ppp scoring|scramble|fortnite|battleship|cambio|team scoring system|surprise game|floor is lava/.test(s))
     return "TEAM DEV MIX ACTIVITIES";
 
   // Transition
