@@ -938,7 +938,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "CLOSEOUTS";
 
   // Finishing
-  if(/finish|finishes|blind cut|four spots|rim|chase|perceptual|poster|posters|guided series|1 on 1 hi|touchdown/.test(s))
+  if(/finish|finishes|blind cut|1 on 1 surpise hand off|four spots|rim|chase|perceptual|poster|posters|guided series|1 on 1 hi|touchdown/.test(s))
     return "FINISHING";
 
   // Shooting
@@ -966,7 +966,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "REBOUNDING";
 
   // Player Dev Mix
-  if(/aces|exit passes|1 on 2 find a space|gap positioning|retreat|two ball|2 ball|get flashes|get open|find space/.test(s))
+  if(/aces|exit passes|1 on 2 find a space|gap positioning|retreat|two ball|2 on 1 twist vs under|2 ball|get flashes|get open|find space/.test(s))
     return "PLAYER DEV MIX ACTIVITIES";
 
   // Pick and Roll (PNR + switch/under usw)
@@ -974,11 +974,11 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "PICK AND ROLL";
 
   // Team Dev Mix (ADV / Advantage usw)
-  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|4 on 5|5 on 5|6 on 5|zone|ppp scoring|scramble|fortnite|battleship|cambio|team scoring system|surpise|floor is lava/.test(s))
+  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|4 on 5|6 on 5|zone|ppp scoring|scramble|fortnite|battleship|cambio|team scoring system|surpise game|floor is lava/.test(s))
     return "TEAM DEV MIX ACTIVITIES";
 
   // Transition
-  if(/transition|breakout andnbaseball|5 on 5 wheel start|train transition|leak out|outlet|rugby|line touch|two side x out|two\-side x\-out/.test(s))
+  if(/transition|breakout and baseball|5 on 5 wheel start|train transition|leak out|outlet|rugby|line touch|two side x out|two\-side x\-out/.test(s))
     return "TRANSITION";
 
   // Triggers (Coach Tag gehört bei dir zu Dominoes, nicht zu Triggers)
