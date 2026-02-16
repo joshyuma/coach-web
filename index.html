@@ -934,23 +934,23 @@ function categoryFromContentsTitle(exTitle){
 // extra normalize: "3on3" -> "3 on 3", "1on1" -> "1 on 1"
 const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
   // Closeouts
-  if(/closeout|close outs|multi skip|multiskip|bounce closeout|bounce closeouts|blast|pickup|pick up|conegate|cone gate/.test(s))
+  if(/closeout|close outs|multi skip|multiskip|bounce closeout|bounce closeouts|blast|pickup|pick up|conegate|blind close out|skip and hi|cone gate/.test(s))
     return "CLOSEOUTS";
 
   // Finishing
-  if(/finish|finishes|rim|chase|perceptual|poster|posters|guided series|touchdown/.test(s))
+  if(/finish|finishes|blind cut|four spots|rim|chase|perceptual|poster|posters|guided series|1 on 1 hi|touchdown/.test(s))
     return "FINISHING";
 
   // Shooting
-  if(/shoot|shooting|figure|drift|lift|exit footwork/.test(s))
+  if(/shoot|shooting|figure|drift|lift|1 on 1 shot tag|exit footwork/.test(s))
     return "SHOOTING";
 
   // Dribbling
-  if(/dribble|dribbling|grid|skate|skates|hostage|hip turn|spanish|sumo|through the gate|change of speed/.test(s))
+  if(/dribble|dribbling|team knock out|grid|rooted|skate|skates|hostage|hip turn|spanish|sumo|through the gate|change of speed/.test(s))
     return "DRIBBLING";
 
   // Defense
-  if(/defen|defense|protect the rim|mirror game|seven seconds|chest blows|close the gate|lane turns|protect he paint|open and chasesurprise\b/.test(s))
+  if(/defen|7 seconds|defense|protect the rim|mirror game|seven seconds|chest blows|close the gate|lane turns|protect he paint|open and chasesurprise\b/.test(s))
     return "DEFENSE";
 
   // Passing
@@ -966,7 +966,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "REBOUNDING";
 
   // Player Dev Mix
-  if(/aces|exit passes|gap positioning|retreat|two ball|2 ball|get flashes|get open|find space/.test(s))
+  if(/aces|exit passes|1 on 2 find a space|gap positioning|retreat|two ball|2 ball|get flashes|get open|find space/.test(s))
     return "PLAYER DEV MIX ACTIVITIES";
 
   // Pick and Roll (PNR + switch/under usw)
@@ -978,7 +978,7 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
     return "TEAM DEV MIX ACTIVITIES";
 
   // Transition
-  if(/transition|5 on 5 wheel start|train transition|leak out|outlet|rugby|line touch|two side x out|two\-side x\-out/.test(s))
+  if(/transition|breakout andnbaseball|5 on 5 wheel start|train transition|leak out|outlet|rugby|line touch|two side x out|two\-side x\-out/.test(s))
     return "TRANSITION";
 
   // Triggers (Coach Tag gehört bei dir zu Dominoes, nicht zu Triggers)
