@@ -649,7 +649,9 @@ const CATEGORIES = [
   "TRANSITION",
   "PICK AND ROLL",
   "DOMINOES REACTIONS",
-  "WARM-UPS & ENERGIZERS"
+  "WARM-UPS & ENERGIZERS",
+  "CONCEPTUAL PLAYBOOK"
+  
 ];
 
 /* =========================
@@ -899,6 +901,30 @@ const CATEGORY_TITLES = {
     "Tennis Ball Catches",
     "Tennis Ball Drops",
     "Tic Tac Toe Relay"
+  ],
+
+   "CONCEPTUAL PLAYBOOK": [
+    "Arival Spacing",
+    "BOB Sets",
+    "Court-Terminology",
+    "Delay",
+    "Dominoes",
+    "Double",
+    "Gets",
+    "HC Sets",
+    "Off Ball Screens",
+    "Pick and Roll Coverage Solution",
+    "Pick and Roll Spacing",
+    "Pistol",
+    "Post Reaction",
+    "Scrabe",
+    "Shot Spectrum ",
+    "SOB Sets",
+    "Solos and Single Double Tripple Gaps",
+    "Stagger",
+    "Transition",
+    "Triggers",
+    "Zoom"
   ]
 };
 
@@ -992,6 +1018,10 @@ const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
   // Warm-ups & Energizers
   if(/warm|energ|stance games|tennis ball drops|tic tac toe|rock paper scissors|capture the flag|circle tag|cone reaction|pylon exchanges|sheep and wolf|bing bang bong/.test(s))
     return "WARM-UPS & ENERGIZERS";
+
+    // Shooting
+  if( /arival spacing|bob sets|court terminology|delay|dominoes|double|gets|hc sets|off ball screens|pick and roll coverage solution|pick and roll spacing|pistol|post reaction|scrabe|shot spectrum|sob sets|solos and single double tripple gaps|stagger|transition|triggers|zoom"/.test(s))
+    return "CONCEPTUAL PLAYBOOK";
 
   return null;
 
