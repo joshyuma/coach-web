@@ -581,448 +581,1187 @@
 
    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
- <script>
+<script>
 "use strict";
 
-/* ================= PASSWORD ================= */
+/* =========================
+   0) Passwortschutz (stoppt Script wirklich)
+========================= */
 const pw = prompt("Passwort eingeben:");
 if (pw !== "AndiObst42!") {
-  document.body.innerHTML="";
   alert("Falsches Passwort");
+  document.body.innerHTML = "";
+  throw new Error("Wrong password - script stopped");
 }
 
-/* ================= SUPABASE ================= */
+/* =========================
+   1) Supabase Init (darf NIE crashen)
+========================= */
+let supabaseClient = null;
 
 const SUPABASE_URL = "https://yvzneuettfhnejlpmuck.supabase.co";
+// WICHTIG: kein Leerzeichen am Anfang!
 const SUPABASE_ANON_KEY = "sb_publishable_R8JlQ1KY0EKLZjHZbkXTng_TUFbWbUo";
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
+try {
+  if (!window.supabase?.createClient) {
+    console.warn("Supabase library not loaded → app läuft lokal weiter");
+  } else {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    console.log("Supabase ready ✅");
+  }
+} catch (e) {
+  console.warn("Supabase disabled – App läuft lokal weiter ✅", e);
+  supabaseClient = null;
+}
 
-/* ================= AUTH UI ================= */
-
-const btnLogin = document.getElementById("btnLogin");
+/* =========================
+   2) AUTH UI (Login/Logout)
+========================= */
+const btnLogin  = document.getElementById("btnLogin");
 const btnLogout = document.getElementById("btnLogout");
-const authInfo = document.getElementById("authInfo");
+const authInfo  = document.getElementById("authInfo");
 
-function cleanUrl(){
-  history.replaceState({},document.title,location.pathname);
+function getRedirectTo(){
+  // immer zur aktuellen Seite ohne Hash zurück
+  const u = new URL(window.location.href);
+  u.hash = "";
+  u.search = "";
+  return u.toString();
 }
 
-function redirectUrl(){
-  return location.origin + location.pathname;
-}
+async function refreshAuthUI(){
+  if(!btnLogin || !btnLogout || !authInfo) return;
 
-btnLogin.onclick = async ()=>{
-  const email = prompt("Email:");
-  if(!email) return;
+  if(!supabaseClient){
+    btnLogin.style.display = "none";
+    btnLogout.style.display = "none";
+    authInfo.textContent = "";
+    return;
+  }
 
-  await supabaseClient.auth.signInWithOtp({
-    email,
-    options:{ emailRedirectTo: redirectUrl() }
-  });
+  const { data } = await supabaseClient.auth.getSession();
+  const session = data?.session || null;
 
-  alert("Login Link gesendet");
-};
-
-btnLogout.onclick = async ()=>{
-  await supabaseClient.auth.signOut();
-  location.reload();
-};
-
-async function refreshAuth(){
-  const {data}=await supabaseClient.auth.getSession();
-
-  if(data.session){
-    btnLogin.style.display="none";
-    btnLogout.style.display="inline-block";
-    authInfo.textContent=data.session.user.email;
-    cleanUrl();
+  if(session){
+    btnLogin.style.display = "none";
+    btnLogout.style.display = "inline-block";
+    authInfo.textContent = session.user.email || "";
   }else{
-    btnLogin.style.display="inline-block";
-    btnLogout.style.display="none";
-    authInfo.textContent="";
+    btnLogin.style.display = "inline-block";
+    btnLogout.style.display = "none";
+    authInfo.textContent = "";
   }
 }
 
-refreshAuth();
+if(btnLogin && supabaseClient){
+  btnLogin.addEventListener("click", async ()=>{
+    const email = prompt("Email:");
+    if(!email) return;
 
-/* ================= HELPERS ================= */
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: getRedirectTo() }
+    });
 
-const LS={
-  fav:"coach_fav",
-  notes:"coach_notes",
-};
-
-const $=id=>document.getElementById(id);
-const save=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
-const load=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch{return d}};
-const nowId=()=>crypto.randomUUID();
-
-/* ================= STATE ================= */
-
-let EXERCISES=[];
-let trainings=[];
-let favorites=new Set(load(LS.fav,[]));
-let notesById=load(LS.notes,{});
-let currentTrainingId=null;
-
-/* ================= SUPABASE TRAININGS ================= */
-
-async function loadTrainings(){
-  const {data}=await supabaseClient.from("trainings").select("*");
-  trainings=(data||[]).map(t=>({
-    id:t.id,
-    name:t.title,
-    items:t.frames||[],
-    updatedAt:Date.now()
-  }));
-  render();
-}
-
-async function saveTraining(tr){
-  const user=(await supabaseClient.auth.getUser()).data.user;
-  if(!user) return;
-
-  await supabaseClient.from("trainings").upsert({
-    id:tr.id,
-    user_id:user.id,
-    title:tr.name,
-    frames:tr.items,
-    updated_at:new Date().toISOString()
+    if(error) alert(error.message);
+    else alert("Login-Link wurde per Email gesendet ✉️");
   });
 }
 
-async function deleteTraining(id){
-  const user=(await supabaseClient.auth.getUser()).data.user;
-  if(!user) return;
-  await supabaseClient.from("trainings").delete().eq("id",id);
-}
-
-/* ================= TRAINING MUTATOR ================= */
-
-function updateTraining(id,fn){
-  const i=trainings.findIndex(t=>t.id===id);
-  if(i<0)return;
-  fn(trainings[i]);
-  trainings[i].updatedAt=Date.now();
-  saveTraining(trainings[i]);
-  render();
-}
-
-/* ================= ADD TRAINING ================= */
-
-$("btnNewTraining").onclick=async()=>{
-  const name=prompt("Training Name:");
-  if(!name)return;
-
-  const tr={
-    id:nowId(),
-    name,
-    items:[],
-    updatedAt:Date.now()
-  };
-
-  trainings.unshift(tr);
-  await saveTraining(tr);
-  render();
-};
-
-/* ================= TRAINING VIEW ================= */
-
-function openTraining(id){
-  currentTrainingId=id;
-  renderTraining();
-}
-
-function renderTraining(){
-  const tr=trainings.find(t=>t.id===currentTrainingId);
-  if(!tr)return;
-
-  $("trTitle").textContent=tr.name;
-
-  $("trList").innerHTML=tr.items.map((it,i)=>{
-    const ex=EXERCISES.find(e=>e.id===it.exerciseId);
-    return`
-    <div>
-      ${ex?.title||"?"}
-      <button onclick="rmItem(${i})">✕</button>
-    </div>`;
-  }).join("");
-}
-
-window.rmItem=i=>{
-  updateTraining(currentTrainingId,tr=>{
-    tr.items.splice(i,1);
+if(btnLogout && supabaseClient){
+  btnLogout.addEventListener("click", async ()=>{
+    await supabaseClient.auth.signOut();
+    await refreshAuthUI();
+    alert("Logout ✅");
   });
-};
-
-/* ================= RENAME / DELETE ================= */
-
-$("trRename").onclick=()=>{
-  const tr=trainings.find(t=>t.id===currentTrainingId);
-  const n=prompt("Neuer Name:",tr.name);
-  if(!n)return;
-  updateTraining(currentTrainingId,t=>t.name=n);
-};
-
-$("trDelete").onclick=async()=>{
-  if(!confirm("Löschen?"))return;
-  await deleteTraining(currentTrainingId);
-  trainings=trainings.filter(t=>t.id!==currentTrainingId);
-  currentTrainingId=null;
-  render();
-};
-
-/* ================= EXERCISE ADD ================= */
-
-window.addExerciseToTraining=(tid,eid)=>{
-  updateTraining(tid,tr=>{
-    tr.items.push({exerciseId:eid});
-  });
-};
-
-/* ================= BASIC RENDER ================= */
-
-function render(){
-  $("list").innerHTML=trainings.map(t=>`
-    <div onclick="openTraining('${t.id}')">${t.name}</div>
-  `).join("");
 }
 
-/* ================= BOOT ================= */
+// Auth state change → UI updaten
+if(supabaseClient){
+  supabaseClient.auth.onAuthStateChange(async ()=>{
+    // URL clean (remove #access_token/#error)
+    if(location.hash && location.hash.length){
+      history.replaceState({}, document.title, location.pathname + location.search);
+    }
+    await refreshAuthUI();
+    // Trainings nach Login neu laden
+    await loadTrainingsFromSupabaseSafe();
+    render();
+  });
+}
 
-(async()=>{
-  await loadTrainings();
+/* =========================
+   3) OCR (wie gehabt – minimal)
+========================= */
+const OCR = {
+  enabled: true,
+  lang: "eng",
+  cachePrefix: "coach_ocr_v2:",
+  concurrency: 2,
+};
+
+function ocrKey(url){ return OCR.cachePrefix + url; }
+function ocrGet(url){ try{ return localStorage.getItem(ocrKey(url)); }catch(e){ return null; } }
+function ocrSet(url, txt){ try{ localStorage.setItem(ocrKey(url), txt); }catch(e){} }
+
+async function ocrImage(url){
+  const cached = ocrGet(url);
+  if(cached !== null) return cached;
+
+  const r = await Tesseract.recognize(url, OCR.lang);
+
+  let text = (r?.data?.text || "")
+    .replace(/[’‘]/g,"'")
+    .replace(/\s+/g," ")
+    .replace(/[^\x20-\x7E]/g," ")
+    .toLowerCase();
+
+  ocrSet(url, text);
+  return text;
+}
+
+async function buildOcrIndex(exercises){
+  let i = 0;
+  const workers = Math.max(1, OCR.concurrency|0);
+
+  async function worker(){
+    while(i < exercises.length){
+      const ex = exercises[i++];
+      const img = ex?.screenshots?.[0];
+      if(!img){ ex.ocrText=""; continue; }
+      try{ ex.ocrText = await ocrImage(img); }
+      catch{ ex.ocrText = ""; }
+    }
+  }
+
+  await Promise.all(Array.from({length: workers}, ()=>worker()));
+}
+
+/* =========================
+   4) Kategorien + Mapping (dein Stand)
+========================= */
+const CATEGORIES = [
+  "FINISHING","CLOSEOUTS","SHOOTING","DRIBBLING","PASSING","DEFENSE","POST","REBOUNDING",
+  "PLAYER DEV MIX ACTIVITIES","TEAM DEV MIX ACTIVITIES","TRIGGERS","TRANSITION","PICK AND ROLL",
+  "DOMINOES REACTIONS","WARM-UPS & ENERGIZERS","CONCEPTUAL PLAYBOOK"
+];
+
+// DEIN CATEGORY_TITLES bleibt wie bei dir (zu lang für Teil 1)
+// -> Teil 2 enthält: CATEGORY_TITLES + categoryFromContentsTitle + Loader + UI + Trainings + Supabase Persist
+
+/* =========================
+   5) Storage Keys
+========================= */
+const LS = {
+  tab: "coach_tab_final_v1",
+  cats: "coach_cats_final_v1",
+  fav: "coach_fav_final_v1",
+  notes: "coach_notes_final_v1",
+  trainings: "coach_trainings_final_v1",
+  catOverrides: "coach_cat_overrides_final_v1",
+  manifestCache: "coach_manifest_cache_final_v1"
+};
+
+/* =========================
+   6) Helpers
+========================= */
+const $ = (id)=>document.getElementById(id);
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  }catch(e){
+    return fallback;
+  }
+}
+function saveJSON(key, val){
+  try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){}
+}
+function escapeHTML(s){
+  return (s+"")
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+function norm(s){
+  return (s||"")
+    .toLowerCase()
+    .replace(/[’‘]/g,"'")
+    .replaceAll("ä","ae").replaceAll("ö","oe").replaceAll("ü","ue").replaceAll("ß","ss")
+    .replace(/[-_]+/g," ")
+    .replace(/[^a-z0-9]+/g," ")
+    .replace(/\s+/g," ")
+    .trim();
+}
+function tokenize(q){
+  const n = norm(q);
+  return n ? n.split(/\s+/).filter(Boolean) : [];
+}
+function nowId(){
+  // kompatibel ohne crypto.randomUUID (Safari alt)
+  return "tr_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+}
+
+/* =========================
+   ===== TEIL 2 / 2 =====
+   (kommt DIREKT unter Teil 1)
+========================= */
+
+/* =========================
+   7) CATEGORY_TITLES (deine Wahrheit)
+========================= */
+const CATEGORY_TITLES = {
+  "FINISHING": [
+    "1-on-1 Around the Arc","1-on-1 Blind Start","1-on-1 Block","1-on-1 Bump Tap",
+    "1-on-1 Cat and Mouse","1-on-1 Chase Down","1-on-1 Continuous Posters",
+    "1-on-1 Corner Finishes","1-on-1 Double Contest","1-on-1 Elbow Touches",
+    "1-on-1 Five Spots","1-on-1 Guided Series","1-on-1 Guided vs Primary DEF",
+    "1-on-1 High-5","1-on-1 Loop","1-on-1 Multi-Primary and Stunt","1-on-1 Octopus",
+    "1-on-1 Paint Escape","1-on-1 Shadow","1-on-1 Sideline Angle","1-on-1 Smile",
+    "1-on-1 Surprise Hand Off","1-on-1 Trail","1-on-1 Transition Finishes",
+    "1-on-1 Wing Finishes","1-on-1 Wing Touchdown","1-on-1 X-Out","1-on-1 +1 Blind Cut",
+    "1-on-2 Chaos","1-on-2 Guided vs Primary and Help Defense","1-on-2 Guided vs Primary and Stunt DEF",
+    "1-on-3 Guided vs All","1-on-1 Perceptual Finishes"
+  ],
+  "CLOSEOUTS": [
+    "1-on-1 Blast Pick-Up","1-on-1 Blasts Conegate","1-on-1 Bounce Closeouts",
+    "1-on-1 Guided Catch Footwork","1-on-1 Cone Blasts","1-on-1 Cone Touch",
+    "1-on-1 Multi Skip and Closeout","1-on-1 Sprint Ins","1-on-1 Sprint Pick-Up",
+    "1-on-1 +1 Blast Cuts","1-on-1 +1 Blind Closeout","1-on-1 +1 Burst Closeouts",
+    "1-on-1 +1 Corner Closeouts","1-on-1 +1 Skip and High Five"
+  ],
+  "SHOOTING": [
+    "1-on-1 Catch Me If You Can","1-on-1 Drift and Lift","1-on-1 Exit Footwork",
+    "1-on-1 Figure of 8’s","1-on-1 Push-Off Shooting","Cone Tag","Move the Cones"
+  ],
+  "DRIBBLING": [
+    "1-on-1 Change of Speed","1-on-1 Dribble Combos into Finish","1-on-1 Grid","1-on-1 Grid Attack",
+    "1-on-1 Guided Hip Turn","1-on-1 Guided Skates","1-on-1 Hip Turn","1-on-1 Hostage","1-on-1 Routed",
+    "1-on-1 Skate and Push","1-on-1 Spanish Dribbles","1-on-1 Straight Line or Counter","1-on-1 Sumo",
+    "1-on-1 Through the Gate","1-on-2 HC Hit","1-on-2 Touchdown","1-on-3 Gladiator",
+    "Line Tag","Mirror Dribbling","Pac-Man Tag","Push Out Races","Pylon Dribbles","Red Light Green Light",
+    "Team Knockout","Team Tag"
+  ],
+  "DEFENSE": [
+    "1-on-1 Seven Seconds","1-on-1 Chest Blows","1-on-1 Close the Gate","1-on-1 Lane Turns",
+    "1-on-1 Mirror Game","1-on-1 Open and Chase","1-on-1 Protect the Paint","1-on-1 Surprise",
+    "4-on-4 Prison Break"
+  ],
+  "PASSING": [
+    "1-on-1 Ping-Pong","1-on-1 Basketball Tennis","1-on-1 +1 Grid Passing","1-on-1 +1 Make a Lead",
+    "2-on-0 Rapid Fire Competition","2-on-1 Three in a Row","2-on-1 Pivot Surprise","2-on-2 Bowling Strikes",
+    "3-on-1 Passing","3-on-3 Touchdown","4-on-2 Rondo","4-on-4 Keep Away","Basketball Handball",
+    "Four-Sports","Hunter Tag","Pass Tag","Take-Two Passing"
+  ],
+  "POST": [
+    "1-on-1 Quick Ups","1-on-1 +1 Deep Hooks","1-on-1 +1 Deep Seals","2-on-2 Continuous",
+    "3-on-3 T-Post Decisions","4-on-4 Career into T-Post","4-on-4 Post Reactions","5-on-5 Post Surprise"
+  ],
+  "REBOUNDING": [
+    "1-on-1 Shuffle Rebounds","1-on-1 +1 Hot Potato","1-on-1 +1 Weak Side Rebounding"
+  ],
+  "PLAYER DEV MIX ACTIVITIES": [
+    "1-on-1 Aces","1-on-1 Exit Passes","1-on-1 Gap Positioning","1-on-1 Pick-Up","1-on-1 Retreat","1-on-1 Two-Ball",
+    "1-on-1 +1 Get Flashes","1-on-1 +1 Trail and Cut","1-on-1 +2 Get Open","1-on-2 Find Space",
+    "2-on-1 Smash or Slip","2-on-1 Twist Versus Under","2-on-2 Gets"
+  ],
+  "PICK AND ROLL": [
+    "1-on-1 Avoid the Pick","1-on-1 +1 Cancel the Pick","2-on-2 Australia","2-on-2 Call the Coverage",
+    "2-on-2 Gentleman’s Stance","3-on-3 High-Low Versus Switch","3-on-3 Stack Pick and Roll",
+    "3-on-3 What Weapon Versus Switch","4-on-4 Scram Switch","4-on-4 Swing to Random PNR"
+  ],
+  "TRIGGERS": [
+    "3-on-3 Cross Screen","3-on-3 Touch Action","4-on-4 Cross Screen Down Screen"
+  ],
+  "TRANSITION": [
+    "1-on-1 +1 Leak Out","2-on-1 Continuous HC","2-on-1 Skip or Push","2-on-2 Two Side X-Out","2-on-3 Outlet",
+    "3-on-3 Rugby","4-on-3 Two Side","4-on-4 Line Touch","5-on-5 Train Transition","5-on-5 Wheelchair",
+    "Animals Game","Breakout and Baseball","Circle Touch","Spacing Races"
+  ],
+  "DOMINOES REACTIONS": [
+    "1-on-1 Multi Out to Space","1-on-1 +1 Second Cuts","2-on-1 Shooting","2-on-1 Two-Side Skip","2-on-1 +1 Shooting",
+    "2-on-2 Lateral Stack","2-on-2 Post-Pen Reaction","2-on-2 Wave","2-on-2 Wheel Skip","3-on-2 Bursts",
+    "3-on-2 Zero Seconds","3-on-3 Coach Tag","3-on-3 Criss-Cross","3-on-3 Two-Side Coach Tag","4-on-3 Bursts",
+    "4-on-4 Coach Touch","4-on-4 Dominoes"
+  ],
+  "TEAM DEV MIX ACTIVITIES": [
+    "2-on-2 Neutral or Advantage","3-on-3 3 Stages","4-on-5 Attack","5-on-5 on 5 Charger","6-on-5 Zone",
+    "Attack the Mouse / Turtle","Battleship","Cambio Game","Fortnite","PPP Scoring","Scramble Touch Game","Stack Start",
+    "Surprise Game","Team Scoring System","Floor is Lava Constraint"
+  ],
+  "WARM-UPS & ENERGIZERS": [
+    "Bing Bang Bong","Capture the Flag","Circle Tag","Cone Reaction","Pylon Exchanges","Rock Paper Scissors",
+    "Sheep and Wolf Tag","Stance Games","Tennis Ball Catches","Tennis Ball Drops","Tic Tac Toe Relay"
+  ],
+  "CONCEPTUAL PLAYBOOK": [
+    "Arival Spacing","BOB Sets","Court-Terminology","Delay","Dominoes","Double","Gets","HC Sets","Off Ball Screens",
+    "Pick and Roll Coverage Solution","Pick and Roll Spacing","Pistol","Post Reaction","Scrabe","Shot Spectrum",
+    "SOB Sets","Solos and Single Double Tripple Gaps","Stagger","Transition","Triggers","Zoom"
+  ]
+};
+
+/* =========================
+   8) Titel-Normalisierung + Mapping
+========================= */
+function keyFromTitle(s){
+  return (s||"")
+    .toLowerCase()
+    .replace(/[’‘]/g,"'")
+    .replace(/[^a-z0-9]+/g," ")
+    .trim()
+    .replace(/\s+/g," ");
+}
+
+const TITLE_TO_CATEGORY = (() => {
+  const m = Object.create(null);
+  for(const [cat, titles] of Object.entries(CATEGORY_TITLES)){
+    for(const t of titles){
+      m[keyFromTitle(t)] = cat;
+    }
+  }
+  return m;
 })();
 
-/* =====================================================
-   TRAINING CRUD + SUPABASE FINAL VERSION
-   (Speichert ALLES korrekt)
-===================================================== */
+function categoryFromContentsTitle(exTitle){
+  const k = keyFromTitle(exTitle);
+  if(TITLE_TO_CATEGORY[k]) return TITLE_TO_CATEGORY[k];
 
-let trainings = [];
-let currentTrainingId = null;
+  // zusätzliche Normalisierung: 1on1 -> 1 on 1
+  const s = k.replace(/\b([0-9])on([0-9])\b/g, "$1 on $2");
 
-/* ---------- SAFE USER ---------- */
-async function getUserSafe(){
+  if(/closeout|close outs|multi skip|multiskip|bounce closeout|blast|pickup|pick up|conegate|blind close out|cone gate/.test(s)) return "CLOSEOUTS";
+  if(/finish|finishes|blind cut|surprise hand off|rim|chase|perceptual|poster|guided series|touchdown/.test(s)) return "FINISHING";
+  if(/shoot|shooting|figure|drift|lift|exit footwork/.test(s)) return "SHOOTING";
+  if(/dribble|dribbling|grid|rooted|skate|hostage|hip turn|spanish|sumo|through the gate|change of speed/.test(s)) return "DRIBBLING";
+  if(/defen|defense|7 seconds|seven seconds|protect the paint|mirror game|chest blows|close the gate|lane turns|open and chase/.test(s)) return "DEFENSE";
+  if(/pass|passing|tennis|rapid fire|pivot surprise|rondo|keep away|handball|four sports|take two/.test(s)) return "PASSING";
+  if(/t post|t\-post|deep hooks|deep seals|quick ups|post reactions|post surprise/.test(s)) return "POST";
+  if(/rebound|rebounding|hot potato|weak side/.test(s)) return "REBOUNDING";
+  if(/aces|exit passes|gap positioning|retreat|two ball|get flashes|get open|find space|smash or slip/.test(s)) return "PLAYER DEV MIX ACTIVITIES";
+  if(/pick and roll|pick\-and\-roll|pnr|avoid the pick|cancel the pick|australia|call the coverage|gentleman|hi lo|high\-low|what weapon|scram switch|swing to random|under\b/.test(s)) return "PICK AND ROLL";
+  if(/neutral or advantage|neutral or advantageous|advantage|adv\b|3 stages|three stages|6 on 5|zone|ppp|scramble|fortnite|battleship|cambio|team scoring|surprise game|floor is lava/.test(s)) return "TEAM DEV MIX ACTIVITIES";
+  if(/transition|breakout and baseball|train transition|leak out|outlet|rugby|line touch|two side x out/.test(s)) return "TRANSITION";
+  if(/cross screen|down screen|touch action/.test(s)) return "TRIGGERS";
+  if(/domino|reaction|coach tag|coach touch|criss cross|burst|bursts|wave|wheel skip|lateral stack|post pen|zero seconds/.test(s)) return "DOMINOES REACTIONS";
+  if(/warm|energ|stance games|tennis ball drops|tic tac toe|rock paper scissors|capture the flag|circle tag|cone reaction|pylon exchanges|sheep and wolf|bing bang bong/.test(s)) return "WARM-UPS & ENERGIZERS";
+  if(/arival spacing|bob sets|court terminology|delay|double|gets|hc sets|off ball screens|coverage solution|spacing|pistol|post reaction|scrabe|shot spectrum|sob sets|solos|stagger|zoom/.test(s)) return "CONCEPTUAL PLAYBOOK";
+
+  return null;
+}
+
+/* =========================
+   9) Overrides (lokal)
+========================= */
+let catOverrides = loadJSON(LS.catOverrides, {});
+
+function setExerciseCategory(ex, newCat){
+  if(!ex || !ex.id) return;
+  const cat = (newCat||"").trim();
+  if(!cat) return;
+  if(!CATEGORIES.includes(cat)){
+    alert("Unbekannte Kategorie: " + cat);
+    return;
+  }
+  ex.category = cat;
+  catOverrides[ex.id] = cat;
+  saveJSON(LS.catOverrides, catOverrides);
+}
+
+function applyCategoryOverrides(){
+  if(!Array.isArray(EXERCISES)) return;
+  for(const ex of EXERCISES){
+    const ov = catOverrides?.[ex.id];
+    if(ov && CATEGORIES.includes(ov)) ex.category = ov;
+  }
+}
+
+/* =========================
+   10) Bild-Datei → Title Helpers
+========================= */
+function titleFromBase(base){
+  let t = (base||"").replace(/\.png$/i,"");
+  t = t.replace(/-([0-9]+)$/,"");
+  t = t.replaceAll("-", " ");
+  t = t.replace(/\bplus\b/g, "+");
+  t = t.replace(/\b(on)\b/g, "on");
+  t = t.split(" ").filter(Boolean).map(w=>{
+    if(/^[0-9]+$/.test(w)) return w;
+    if(w==="on" || w==="vs") return w;
+    if(w==="pnr") return "PNR";
+    if(w.length<=2 && w.includes("+")) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(" ");
+  t = t.replace(/\b([0-9]+)\sOn\s([0-9]+)\b/g, "$1-on-$2");
+  t = t.replace(/\s+/g," ").trim();
+  return t;
+}
+
+function baseKeyFromFilename(filename){
+  let f = (filename||"").replace(/^.*\//,"");
+  f = f.replace(/\.png$/i,"");
+  f = f.replace(/-[0-9]+$/,"");
+  return f;
+}
+
+function sortByNumberSuffix(a,b){
+  const na = (a.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(a.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+  const nb = (b.match(/-([0-9]+)\.png$/i)?.[1]) ? parseInt(b.match(/-([0-9]+)\.png$/i)[1],10) : 0;
+  return na - nb;
+}
+
+/* =========================
+   11) App State
+========================= */
+let activeTab    = loadJSON(LS.tab, "exercises");
+let selectedCats = loadJSON(LS.cats, []);
+let favorites    = new Set(loadJSON(LS.fav, []));
+let notesById    = loadJSON(LS.notes, {});
+let trainings    = loadJSON(LS.trainings, []); // lokal fallback
+let EXERCISES    = [];
+
+const searchEl = $("search");
+const chipsEl  = $("chips");
+const listEl   = $("list");
+
+/* =========================
+   12) Supabase Persist Layer (Trainings)
+========================= */
+const _saveTimersById = new Map();
+
+async function sbUser(){
   if(!supabaseClient) return null;
-  const { data } = await supabaseClient.auth.getUser();
+  const { data, error } = await supabaseClient.auth.getUser();
+  if(error) return null;
   return data?.user || null;
 }
 
-/* ---------- LOAD TRAININGS ---------- */
-async function loadTrainingsFromSupabase(){
+function queueSaveTraining(tr, delayMs=250){
+  if(!supabaseClient || !tr?.id) return;
+  const old = _saveTimersById.get(tr.id);
+  if(old) clearTimeout(old);
+
+  const t = setTimeout(async ()=>{
+    _saveTimersById.delete(tr.id);
+    await saveTrainingToSupabase(tr);
+  }, delayMs);
+
+  _saveTimersById.set(tr.id, t);
+}
+
+async function saveTrainingToSupabase(tr){
+  if(!supabaseClient) return;
+  const user = await sbUser();
+  if(!user) return;
+
+  const row = {
+    id: tr.id,
+    user_id: user.id,
+    title: tr.name || "Training",
+    category: tr.category ?? null,
+    frames: Array.isArray(tr.items) ? tr.items : [],
+    data: tr,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await supabaseClient.from("trainings").upsert(row);
+  if(error) console.warn("Supabase save failed:", error);
+}
+
+async function deleteTrainingFromSupabase(trainingId){
+  if(!supabaseClient) return;
+  const user = await sbUser();
+  if(!user) return;
+
+  const { error } = await supabaseClient
+    .from("trainings")
+    .delete()
+    .eq("id", trainingId)
+    .eq("user_id", user.id);
+
+  if(error) console.warn("Supabase delete failed:", error);
+}
+
+async function loadTrainingsFromSupabaseSafe(){
   if(!supabaseClient) return;
 
-  const user = await getUserSafe();
+  const user = await sbUser();
   if(!user) return;
 
   const { data, error } = await supabaseClient
     .from("trainings")
     .select("*")
     .eq("user_id", user.id)
-    .order("updated_at", { ascending:false });
+    .order("updated_at", { ascending: false });
 
   if(error){
-    console.warn("Load error:", error);
+    console.warn("Load failed:", error);
     return;
   }
 
-  trainings = (data || []).map(t => ({
+  trainings = (data||[]).map(t => ({
     id: t.id,
     name: t.title,
+    category: t.category ?? null,
     items: t.frames || [],
-    updatedAt: new Date(t.updated_at).getTime()
+    createdAt: t.created_at ? new Date(t.created_at).getTime() : Date.now(),
+    updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : Date.now()
   }));
 
-  render();
+  saveJSON(LS.trainings, trainings); // lokal spiegeln
 }
 
-/* ---------- SAVE TRAINING ---------- */
-async function persistTraining(tr){
-  if(!supabaseClient) return;
+/* =========================
+   13) Loader (Manifest)
+========================= */
+async function fetchJsonTry(url){
+  const res = await fetch(url, { cache:"no-cache" });
+  if(!res.ok) throw new Error("NOT_OK " + url);
+  return await res.json();
+}
 
-  const user = await getUserSafe();
-  if(!user) return;
+async function loadManifestFiles(){
+  let data;
+  try{ data = await fetchJsonTry("assets/manifest.json"); }
+  catch{ data = await fetchJsonTry("assets/previews/manifest.json"); }
+  if(!data || !Array.isArray(data.files)) throw new Error("manifest.json Format falsch");
+  return data.files;
+}
 
-  const row = {
-    id: tr.id,
-    user_id: user.id,
-    title: tr.name,
-    frames: tr.items,
-    updated_at: new Date().toISOString()
-  };
-
-  const { error } = await supabaseClient
-    .from("trainings")
-    .upsert(row);
-
-  if(error){
-    console.warn("Save failed:", error);
+function parseLinksFromDirectoryHtml(html){
+  const files = [];
+  const re = /href="([^"]+?\.png)"/gi;
+  let m;
+  while((m=re.exec(html))!==null){
+    let href = m[1];
+    if(href.startsWith("?") || href.startsWith("/") || href.includes("..")) continue;
+    href = href.split("?")[0];
+    files.push(href);
   }
+  return Array.from(new Set(files));
 }
 
-/* ---------- DELETE ---------- */
-async function deleteTrainingSupabase(id){
-  if(!supabaseClient) return;
-
-  const user = await getUserSafe();
-  if(!user) return;
-
-  await supabaseClient
-    .from("trainings")
-    .delete()
-    .eq("id", id)
-    .eq("user_id", user.id);
+async function loadFromDirectoryListing(){
+  const res = await fetch("assets/previews/", { cache:"no-cache" });
+  if(!res.ok) throw new Error("Directory listing nicht erreichbar");
+  const html = await res.text();
+  return parseLinksFromDirectoryHtml(html);
 }
 
-/* ---------- UPDATE HELPER ---------- */
-function updateTraining(id, fn){
-  const index = trainings.findIndex(t => t.id === id);
-  if(index < 0) return;
+function normalizeFileToUrl(f){
+  const s = (f||"").trim();
+  if(!s) return null;
+  if(s.startsWith("assets/")) return s;
+  if(s.startsWith("previews/")) return "assets/" + s;
+  return "assets/previews/" + s;
+}
 
-  fn(trainings[index]);
+async function loadAllExercises(){
+  let files = [];
+  try{
+    files = await loadManifestFiles();
+  }catch{
+    try{ files = await loadFromDirectoryListing(); }
+    catch{
+      const cached = loadJSON(LS.manifestCache, []);
+      files = Array.isArray(cached) ? cached : [];
+    }
+  }
 
-  trainings[index].updatedAt = Date.now();
+  if(files.length) saveJSON(LS.manifestCache, files);
 
-  persistTraining(trainings[index]);
+  const resolved = files
+    .filter(x => typeof x === "string")
+    .map(x => x.trim())
+    .filter(Boolean)
+    .map(normalizeFileToUrl)
+    .filter(Boolean);
+
+  const groups = new Map();
+  for(const full of resolved){
+    const filename = full.replace(/^.*\//,"");
+    if(!filename.toLowerCase().endsWith(".png")) continue;
+    const base = baseKeyFromFilename(filename);
+    if(!groups.has(base)) groups.set(base, []);
+    groups.get(base).push(full);
+  }
+
+  const exercises = [];
+  for(const [base, arr] of groups.entries()){
+    arr.sort((a,b)=>sortByNumberSuffix(a.replace(/^.*\//,""), b.replace(/^.*\//,"")));
+    const id = base;
+    const title = titleFromBase(base);
+    const mapped = categoryFromContentsTitle(title);
+    const category = mapped || "unsorted";
+    exercises.push({ id, title, base, category, screenshots: arr, ocrText:"" });
+  }
+
+  EXERCISES = exercises;
+  applyCategoryOverrides();
+
+  EXERCISES.sort((a,b)=>{
+    const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+    const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+    return c !== 0 ? c : a.title.localeCompare(b.title);
+  });
+
+  const sub = $("subline");
+  if(sub) sub.textContent = `${EXERCISES.length} Übungen geladen • Trainings • PDF Export`;
+}
+
+/* =========================
+   14) UI Render
+========================= */
+function setTab(tab){
+  activeTab = tab;
+  saveJSON(LS.tab, activeTab);
+
+  $("tabExercises")?.setAttribute("data-on", tab==="exercises" ? "1":"0");
+  $("tabTrainings")?.setAttribute("data-on", tab==="trainings" ? "1":"0");
+  $("tabFavs")?.setAttribute("data-on", tab==="favs" ? "1":"0");
+
+  if(tab==="trainings"){
+    $("rightTitle").textContent = "Trainings";
+    $("rightSub").textContent   = "Training öffnen → Reihenfolge → Export als PDF";
+  }else if(tab==="favs"){
+    $("rightTitle").textContent = "Favoriten";
+    $("rightSub").textContent   = "Nur deine Favoriten (mit Filter & Suche)";
+  }else{
+    $("rightTitle").textContent = "Übungen";
+    $("rightSub").textContent   = "Tippe eine Übung → Vorschau → zu Training / Favorit";
+  }
   render();
 }
 
-/* =====================================================
-   CREATE TRAINING
-===================================================== */
+function renderChips(){
+  if(!chipsEl) return;
+  chipsEl.innerHTML = CATEGORIES.map(cat=>{
+    const on = selectedCats.includes(cat) ? "1":"0";
+    return `<div class="chip" data-cat="${escapeHTML(cat)}" data-on="${on}" role="button" tabindex="0">
+      <span class="dot"></span><span>${escapeHTML(cat)}</span></div>`;
+  }).join("");
 
-document.getElementById("btnNewTraining").onclick = async () => {
-  const name = prompt("Name für neues Training:");
+  chipsEl.querySelectorAll(".chip").forEach(ch=>{
+    const cat = ch.getAttribute("data-cat");
+    const toggle = ()=>{
+      selectedCats = selectedCats.includes(cat)
+        ? selectedCats.filter(x=>x!==cat)
+        : [...selectedCats, cat];
+      saveJSON(LS.cats, selectedCats);
+      render();
+    };
+    ch.addEventListener("click", toggle);
+    ch.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); toggle(); }});
+  });
+}
+
+// Phrase-Suche: wenn mehrere Wörter → exakt in Reihenfolge
+function matches(ex){
+  const q = norm(searchEl?.value || "");
+  if(!q) return true;
+
+  const hay = norm([ex.title, ex.category, ex.base, ex.ocrText||""].join(" "));
+
+  if(q.includes(" ")){
+    return hay.includes(q);
+  }
+  return hay.includes(q);
+}
+
+function visibleExercises(){
+  let base = EXERCISES.slice();
+
+  if(activeTab==="favs") base = base.filter(e => favorites.has(e.id));
+  if(selectedCats.length) base = base.filter(e => selectedCats.includes(e.category));
+
+  const q = norm(searchEl?.value || "");
+  if(q) base = base.filter(e => matches(e));
+
+  return base;
+}
+
+function renderExercises(){
+  const items = visibleExercises();
+  $("hitCount").textContent = items.length;
+
+  if(!items.length){
+    listEl.innerHTML = `<div class="empty">Keine Treffer. Prüfe Filter oder Suche.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = items.map(ex=>{
+    const favOn = favorites.has(ex.id) ? "1":"0";
+    const sc = (ex.screenshots||[]).length;
+    const thumb = ex.screenshots?.[0] || "";
+    return `<div class="card" data-id="${escapeHTML(ex.id)}" role="button" tabindex="0">
+      <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="preview">` : `<div class="ph">kein Bild</div>`}</div>
+      <div class="meta">
+        <p class="t">${escapeHTML(ex.title)}</p>
+        <div class="s">
+          <span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+          <span class="pill">🖼 ${sc} Bild${sc===1?"":"er"}</span>
+        </div>
+      </div>
+      <button class="iconbtn" data-on="${favOn}" aria-label="Favorit">${favOn==="1"?"★":"☆"}</button>
+    </div>`;
+  }).join("");
+
+  listEl.querySelectorAll(".card").forEach(card=>{
+    const id = card.getAttribute("data-id");
+    const favBtn = card.querySelector(".iconbtn");
+
+    favBtn.addEventListener("click",(e)=>{
+      e.stopPropagation();
+      if(favorites.has(id)) favorites.delete(id); else favorites.add(id);
+      saveJSON(LS.fav, Array.from(favorites));
+      render();
+    });
+
+    const open = ()=>openExercise(id);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+  });
+}
+
+function renderTrainings(){
+  if(!trainings.length){
+    listEl.innerHTML = `<div class="empty">Noch kein Training. Tippe oben auf <b>+ Training</b>.</div>`;
+    return;
+  }
+
+  const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  listEl.innerHTML = sorted.map(tr=>{
+    const n = (tr.items||[]).length;
+    return `<div class="card" data-tr="${escapeHTML(tr.id)}" role="button" tabindex="0">
+      <div class="thumb"><div class="ph">TR</div></div>
+      <div class="meta">
+        <p class="t">${escapeHTML(tr.name)}</p>
+        <div class="s">
+          <span class="pill">🧩 ${n} Übung${n===1?"":"en"}</span>
+          <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||tr.createdAt||Date.now()).toLocaleString())}</span>
+        </div>
+      </div>
+      <button class="iconbtn" aria-label="Bearbeiten">✎</button>
+    </div>`;
+  }).join("");
+
+  listEl.querySelectorAll(".card").forEach(card=>{
+    const id = card.getAttribute("data-tr");
+    const open = ()=>openTraining(id);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); }});
+    card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); open(); });
+  });
+}
+
+function render(){
+  renderChips();
+  if(activeTab==="trainings") renderTrainings();
+  else renderExercises();
+}
+
+/* =========================
+   15) Exercise Modal
+========================= */
+let currentExercise = null;
+
+function openExercise(id){
+  const ex = EXERCISES.find(x=>x.id===id);
+  if(!ex) return;
+  currentExercise = ex;
+
+  $("exTitle").textContent = ex.title;
+  $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(ex.category)}</span>
+    <span class="pill">🖼 ${(ex.screenshots||[]).length} Bild${(ex.screenshots||[]).length===1?"":"er"}</span>`;
+
+  $("exFavBtn").textContent = favorites.has(ex.id) ? "★ Favorit" : "☆ Favorit";
+  $("exNotes").value = notesById[ex.id] || "";
+  $("exErr").style.display="none";
+
+  const shots = ex.screenshots || [];
+  $("exPreview").innerHTML = shots.length
+    ? shots.map(src=>`<img src="${escapeHTML(src)}" alt="preview">`).join("")
+    : `<div class="empty">Keine Screenshots hinterlegt.</div>`;
+
+  $("exBack").setAttribute("data-open","1");
+  $("exBack").setAttribute("aria-hidden","false");
+}
+
+function closeExercise(){
+  $("exBack").setAttribute("data-open","0");
+  $("exBack").setAttribute("aria-hidden","true");
+  currentExercise = null;
+}
+
+$("exClose")?.addEventListener("click", closeExercise);
+$("exBack")?.addEventListener("click",(e)=>{ if(e.target===$("exBack")) closeExercise(); });
+
+$("exFavBtn")?.addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  if(favorites.has(currentExercise.id)) favorites.delete(currentExercise.id);
+  else favorites.add(currentExercise.id);
+  saveJSON(LS.fav, Array.from(favorites));
+  $("exFavBtn").textContent = favorites.has(currentExercise.id) ? "★ Favorit" : "☆ Favorit";
+  render();
+});
+
+$("exOpenShots")?.addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  (currentExercise.screenshots||[]).forEach(src=>window.open(src,"_blank","noopener,noreferrer"));
+});
+
+$("exSaveNotes")?.addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  notesById[currentExercise.id] = $("exNotes").value || "";
+  saveJSON(LS.notes, notesById);
+  alert("Notizen gespeichert ✅");
+});
+
+$("exEditCat")?.addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  const next = prompt("Neue Kategorie:\n\n" + CATEGORIES.join("\n"), currentExercise.category);
+  if(!next) return;
+
+  setExerciseCategory(currentExercise, next);
+  $("exMeta").innerHTML = `<span class="pill">🏷 ${escapeHTML(currentExercise.category)}</span>
+    <span class="pill">🖼 ${(currentExercise.screenshots||[]).length} Bild${(currentExercise.screenshots||[]).length===1?"":"er"}</span>`;
+
+  EXERCISES.sort((a,b)=>{
+    const ca = CATEGORIES.indexOf(a.category), cb = CATEGORIES.indexOf(b.category);
+    const c = (ca===-1?999:ca) - (cb===-1?999:cb);
+    return c !== 0 ? c : a.title.localeCompare(b.title);
+  });
+  render();
+});
+
+/* =========================
+   16) Add to Training
+========================= */
+let addExercise = null;
+
+$("exAddBtn")?.addEventListener("click", ()=>{
+  if(!currentExercise) return;
+  addExercise = currentExercise;
+  $("addMeta").innerHTML = `<span class="pill">➕ ${escapeHTML(addExercise.title)}</span>`;
+  renderAddList();
+  $("addBack").setAttribute("data-open","1");
+  $("addBack").setAttribute("aria-hidden","false");
+});
+
+function closeAdd(){
+  $("addBack").setAttribute("data-open","0");
+  $("addBack").setAttribute("aria-hidden","true");
+  addExercise = null;
+}
+
+$("addClose")?.addEventListener("click", closeAdd);
+$("addBack")?.addEventListener("click",(e)=>{ if(e.target===$("addBack")) closeAdd(); });
+
+function renderAddList(){
+  const el = $("addList");
+  if(!trainings.length){
+    el.innerHTML = `<div class="empty">Noch kein Training. Tippe „+ Neues Training“.</div>`;
+    return;
+  }
+
+  const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  el.innerHTML = sorted.map(tr=>{
+    return `<div class="card" data-tr="${escapeHTML(tr.id)}">
+      <div class="thumb"><div class="ph">TR</div></div>
+      <div class="meta">
+        <p class="t">${escapeHTML(tr.name)}</p>
+        <div class="s"><span class="pill">🧩 ${(tr.items||[]).length} Übungen</span></div>
+      </div>
+      <button class="iconbtn">＋</button>
+    </div>`;
+  }).join("");
+
+  el.querySelectorAll(".card").forEach(card=>{
+    const trId = card.getAttribute("data-tr");
+    const addIt = async ()=>{
+      await addExerciseToTraining(trId, addExercise.id);
+      alert("Hinzugefügt ✅");
+      renderAddList();
+      render();
+    };
+    card.addEventListener("click", addIt);
+    card.querySelector(".iconbtn").addEventListener("click",(e)=>{ e.stopPropagation(); addIt(); });
+  });
+}
+
+$("addCreate")?.addEventListener("click", async ()=>{
+  const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
   if(!name) return;
 
-  const tr = {
-    id: crypto.randomUUID(),
-    name,
-    items: [],
-    updatedAt: Date.now()
-  };
-
-  trainings.unshift(tr);
-  await persistTraining(tr);
+  const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+  trainings = [tr, ...trainings];
+  saveJSON(LS.trainings, trainings);
+  renderAddList();
   render();
-};
 
-/* =====================================================
-   OPEN TRAINING
-===================================================== */
+  await saveTrainingToSupabase(tr);
+});
+
+async function addExerciseToTraining(trainingId, exerciseId){
+  const idx = trainings.findIndex(t => t.id === trainingId);
+  if(idx < 0) return;
+
+  const tr = trainings[idx];
+  tr.items = Array.isArray(tr.items) ? tr.items : [];
+  tr.items.push({ exerciseId, addedAt: Date.now() });
+  tr.updatedAt = Date.now();
+
+  trainings[idx] = tr;
+  saveJSON(LS.trainings, trainings);
+
+  // ✅ Supabase persist
+  queueSaveTraining(tr);
+}
+
+/* =========================
+   17) Training CRUD + Editor
+========================= */
+$("btnNewTraining")?.addEventListener("click", async ()=>{
+  const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
+  if(!name) return;
+
+  const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+  trainings = [tr, ...trainings];
+  saveJSON(LS.trainings, trainings);
+
+  setTab("trainings");
+  render();
+
+  await saveTrainingToSupabase(tr);
+});
+
+let currentTrainingId = null;
 
 function openTraining(id){
-  currentTrainingId = id;
-  renderTraining();
-}
-
-function renderTraining(){
-  const tr = trainings.find(t => t.id === currentTrainingId);
+  const tr = trainings.find(t=>t.id===id);
   if(!tr) return;
+  currentTrainingId = id;
 
-  document.getElementById("trTitle").textContent = tr.name;
+  $("trTitle").textContent = tr.name;
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
 
-  document.getElementById("trList").innerHTML =
-    tr.items.map((it, i) => {
-      const ex = EXERCISES.find(e => e.id === it.exerciseId);
-      return `
-      <div>
-        ${ex?.title || "Unbekannt"}
-        <button onclick="rmItem(${i})">✕</button>
-        <button onclick="moveUp(${i})">▲</button>
-        <button onclick="moveDown(${i})">▼</button>
-      </div>
-      `;
-    }).join("");
+  renderTrainingList();
+
+  $("trBack").setAttribute("data-open","1");
+  $("trBack").setAttribute("aria-hidden","false");
 }
 
-/* =====================================================
-   REMOVE / MOVE
-===================================================== */
+function closeTraining(){
+  $("trBack").setAttribute("data-open","0");
+  $("trBack").setAttribute("aria-hidden","true");
+  currentTrainingId = null;
+}
 
-window.rmItem = (i)=>{
-  updateTraining(currentTrainingId, tr=>{
-    tr.items.splice(i,1);
-  });
-};
+$("trClose")?.addEventListener("click", closeTraining);
+$("trBack")?.addEventListener("click",(e)=>{ if(e.target===$("trBack")) closeTraining(); });
 
-window.moveUp = (i)=>{
-  updateTraining(currentTrainingId, tr=>{
-    if(i <= 0) return;
-    [tr.items[i-1], tr.items[i]] = [tr.items[i], tr.items[i-1]];
-  });
-};
-
-window.moveDown = (i)=>{
-  updateTraining(currentTrainingId, tr=>{
-    if(i >= tr.items.length-1) return;
-    [tr.items[i+1], tr.items[i]] = [tr.items[i], tr.items[i+1]];
-  });
-};
-
-/* =====================================================
-   RENAME
-===================================================== */
-
-document.getElementById("trRename").onclick = ()=>{
+function renderTrainingList(){
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
 
+  const items = tr.items || [];
+  const list  = $("trList");
+  const empty = $("trEmpty");
+
+  if(!items.length){
+    empty.style.display="block";
+    list.innerHTML="";
+    return;
+  }
+  empty.style.display="none";
+
+  list.innerHTML = items.map((it, idx)=>{
+    const ex = EXERCISES.find(e=>e.id===it.exerciseId);
+    const title = ex ? ex.title : ("Unbekannt: " + it.exerciseId);
+    const cat = ex ? ex.category : "—";
+    const sc = ex?.screenshots?.length || 0;
+    const thumb = ex?.screenshots?.[0] || "";
+    return `<div class="card" data-idx="${idx}">
+      <div class="thumb">${thumb ? `<img src="${escapeHTML(thumb)}" alt="p">` : `<div class="ph">—</div>`}</div>
+      <div class="meta">
+        <p class="t">${escapeHTML(title)}</p>
+        <div class="s">
+          <span class="pill">🏷 ${escapeHTML(cat)}</span>
+          <span class="pill">🖼 ${sc}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex:0 0 auto">
+        <button class="iconbtn" data-act="up">▲</button>
+        <button class="iconbtn" data-act="down">▼</button>
+        <button class="iconbtn" data-act="rm">✕</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  list.querySelectorAll(".card").forEach(card=>{
+    const idx = Number(card.getAttribute("data-idx"));
+    card.querySelectorAll(".iconbtn").forEach(b=>{
+      b.addEventListener("click",(e)=>{
+        e.stopPropagation();
+        trainingAction(b.getAttribute("data-act"), idx);
+      });
+    });
+    card.addEventListener("click", ()=>{
+      const t = trainings.find(x=>x.id===currentTrainingId);
+      const exId = (t.items||[])[idx]?.exerciseId;
+      if(exId) openExercise(exId);
+    });
+  });
+}
+
+function trainingAction(act, idx){
+  const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+  if(tIdx<0) return;
+
+  const tr = trainings[tIdx];
+  tr.items = tr.items || [];
+
+  if(act==="rm") tr.items.splice(idx,1);
+  if(act==="up" && idx>0){ const tmp=tr.items[idx-1]; tr.items[idx-1]=tr.items[idx]; tr.items[idx]=tmp; }
+  if(act==="down" && idx<tr.items.length-1){ const tmp=tr.items[idx+1]; tr.items[idx+1]=tr.items[idx]; tr.items[idx]=tmp; }
+
+  tr.updatedAt = Date.now();
+  trainings[tIdx]=tr;
+  saveJSON(LS.trainings, trainings);
+
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
+
+  renderTrainingList();
+  render();
+
+  // ✅ persist
+  queueSaveTraining(tr);
+}
+
+$("trRename")?.addEventListener("click", ()=>{
+  const tIdx = trainings.findIndex(t=>t.id===currentTrainingId);
+  if(tIdx<0) return;
+
+  const tr = trainings[tIdx];
   const name = prompt("Neuer Name:", tr.name);
   if(!name) return;
 
-  updateTraining(currentTrainingId, t=>{
-    t.name = name;
-  });
-};
+  tr.name = name.trim();
+  tr.updatedAt = Date.now();
 
-/* =====================================================
-   DELETE
-===================================================== */
+  trainings[tIdx]=tr;
+  saveJSON(LS.trainings, trainings);
 
-document.getElementById("trDelete").onclick = async ()=>{
-  if(!confirm("Training wirklich löschen?")) return;
-
-  await deleteTrainingSupabase(currentTrainingId);
-
-  trainings = trainings.filter(t=>t.id!==currentTrainingId);
-  currentTrainingId = null;
+  $("trTitle").textContent = tr.name;
+  $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
+    <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
 
   render();
-};
+  queueSaveTraining(tr);
+});
 
-/* =====================================================
-   ADD EXERCISE
-===================================================== */
+$("trDuplicate")?.addEventListener("click", async ()=>{
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
 
-window.addExerciseToTraining = (tid, eid)=>{
-  updateTraining(tid, tr=>{
-    tr.items.push({ exerciseId: eid });
-  });
-};
+  const copy = {
+    id: nowId(),
+    name: tr.name + " (Kopie)",
+    items: (tr.items||[]).map(x=>({ ...x })),
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  };
 
-/* =====================================================
-   BASIC LIST RENDER
-===================================================== */
+  trainings = [copy, ...trainings];
+  saveJSON(LS.trainings, trainings);
 
-function render(){
-  document.getElementById("list").innerHTML =
-    trainings.map(t =>
-      `<div onclick="openTraining('${t.id}')">${t.name}</div>`
-    ).join("");
-}
+  alert("Dupliziert ✅");
+  openTraining(copy.id);
+  render();
 
-/* =====================================================
-   BOOT
-===================================================== */
+  await saveTrainingToSupabase(copy);
+});
 
-(async ()=>{
-  await loadTrainingsFromSupabase();
+$("trDelete")?.addEventListener("click", async ()=>{
+  const tr = trainings.find(t=>t.id===currentTrainingId);
+  if(!tr) return;
+  if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
+
+  trainings = trainings.filter(t=>t.id!==currentTrainingId);
+  saveJSON(LS.trainings, trainings);
+  closeTraining();
+  render();
+
+  await deleteTrainingFromSupabase(tr.id);
+});
+
+/* =========================
+   18) Buttons: Export/Reset/OCR + Tabs + Search
+========================= */
+$("btnReset")?.addEventListener("click", ()=>{
+  if(!confirm("Wirklich alles zurücksetzen? (Favoriten, Trainings, Notizen, Overrides)")) return;
+  localStorage.removeItem(LS.tab);
+  localStorage.removeItem(LS.cats);
+  localStorage.removeItem(LS.fav);
+  localStorage.removeItem(LS.notes);
+  localStorage.removeItem(LS.trainings);
+  localStorage.removeItem(LS.catOverrides);
+  localStorage.removeItem(LS.manifestCache);
+  location.reload();
+});
+
+$("btnOcr")?.addEventListener("click", async ()=>{
+  alert("OCR startet. Einmalig kann das dauern.");
+  await buildOcrIndex(EXERCISES);
+  alert("OCR fertig ✅");
+  render();
+});
+
+$("tabExercises")?.addEventListener("click", ()=>setTab("exercises"));
+$("tabTrainings")?.addEventListener("click", ()=>setTab("trainings"));
+$("tabFavs")?.addEventListener("click", ()=>setTab("favs"));
+
+let sd=null;
+searchEl?.addEventListener("input", ()=>{ clearTimeout(sd); sd=setTimeout(render, 120); });
+
+document.addEventListener("keydown",(e)=>{
+  if(e.key==="Escape"){
+    closeExercise();
+    closeAdd();
+    closeTraining();
+  }
+});
+
+/* =========================
+   19) Boot
+========================= */
+(async function boot(){
+  // lokale defaults speichern
+  saveJSON(LS.tab, activeTab);
+  saveJSON(LS.cats, selectedCats);
+  saveJSON(LS.fav, Array.from(favorites));
+  saveJSON(LS.notes, notesById);
+  saveJSON(LS.trainings, trainings);
+  saveJSON(LS.catOverrides, catOverrides);
+
+  // Auth UI initial
+  await refreshAuthUI();
+
+  // Übungen laden
+  await loadAllExercises();
+
+  // wenn eingeloggt: Supabase Trainings holen (überschreibt lokal)
+  await loadTrainingsFromSupabaseSafe();
+  saveJSON(LS.trainings, trainings);
+
+  renderChips();
+  setTab(activeTab);
+  render();
 })();
 </script>
 </body>
