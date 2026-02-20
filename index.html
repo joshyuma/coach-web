@@ -579,7 +579,6 @@
     </div>
   </div>
 
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
 "use strict";
@@ -597,7 +596,7 @@ let supabaseClient = null;
 
 try {
   const SUPABASE_URL = "https://yvzneuettfhnejlpmuck.supabase.co";
-  const SUPABASE_ANON_KEY = " sb_publishable_R8JlQ1KY0EKLZjHZbkXTng_TUFbWbUo";
+  const SUPABASE_ANON_KEY = "sb_publishable_R8JlQ1KY0EKLZjHZbkXTng_TUFbWbUo";
 
   if (!window.supabase?.createClient) {
     throw new Error("Supabase library not loaded (window.supabase.createClient fehlt)");
@@ -1260,68 +1259,47 @@ let notesById = loadJSON(LS.notes, {});
 let trainings = [];
 
 // ======================================================
-// Supabase Persist Layer (Trainings) – ONE source of truth
+// Supabase Persist Layer (Trainings) – single source of truth
 // ======================================================
 
-// kleine Queue, damit wir nicht bei jedem Klick 10 Upserts feuern
 const _saveTimersById = new Map();
 
-function _isLoggedIn() {
-  return !!supabaseClient;
-}
-
-async function _getUser() {
-  if (!supabaseClient) return null;
+async function sbUser(){
+  if(!supabaseClient) return null;
   const { data, error } = await supabaseClient.auth.getUser();
-  if (error) return null;
+  if(error) return null;
   return data?.user || null;
 }
 
-function _touchTraining(tr) {
-  tr.updatedAt = Date.now();
-  return tr;
-}
+// Speichert ALLES (Name + items + Reihenfolge + etc.)
+async function saveTrainingToSupabase(tr){
+  if(!supabaseClient) return;
 
-// ✅ Upsert (speichert ALLES vom Training)
-async function saveTrainingToSupabase(tr) {
-  if (!supabaseClient) return;
+  const user = await sbUser();
+  if(!user) return;
 
-  const user = await _getUser();
-  if (!user) return;
-
-  // Das DB-Row-Format (passt zu deiner Tabelle: id, user_id, title, category, frames, updated_at, data)
   const row = {
     id: tr.id,
     user_id: user.id,
-    title: tr.name ?? tr.title ?? "Training",
+    title: tr.name || "Training",
     category: tr.category ?? null,
-
-    // WICHTIG: frames muss die Übungen enthalten (bei dir: items)
-    frames: Array.isArray(tr.items) ? tr.items : (Array.isArray(tr.frames) ? tr.frames : []),
-
-    // optional: ganzes Objekt als Backup
-    data: tr,
-
+    frames: Array.isArray(tr.items) ? tr.items : [],
     updated_at: new Date().toISOString(),
+    data: tr
   };
 
   const { error } = await supabaseClient
     .from("trainings")
     .upsert(row);
 
-  if (error) {
-    console.warn("Supabase save failed:", error);
-  } else {
-    console.log("Saved training to Supabase ✅", row.id);
-  }
+  if(error) console.warn("Supabase save failed:", error);
 }
 
-// ✅ Delete (löscht Training)
-async function deleteTrainingFromSupabase(trainingId) {
-  if (!supabaseClient) return;
+async function deleteTrainingFromSupabase(trainingId){
+  if(!supabaseClient) return;
 
-  const user = await _getUser();
-  if (!user) return;
+  const user = await sbUser();
+  if(!user) return;
 
   const { error } = await supabaseClient
     .from("trainings")
@@ -1329,101 +1307,41 @@ async function deleteTrainingFromSupabase(trainingId) {
     .eq("id", trainingId)
     .eq("user_id", user.id);
 
-  if (error) {
-    console.warn("Supabase delete failed:", error);
-  } else {
-    console.log("Deleted training from Supabase ✅", trainingId);
-  }
+  if(error) console.warn("Supabase delete failed:", error);
 }
 
-// ✅ Debounced Save: ruft saveTrainingToSupabase erst nach kurzer Pause auf
-function queueSaveTraining(tr, delayMs = 250) {
-  if (!supabaseClient) return;
 
-  const id = tr?.id;
-  if (!id) return;
+// lädt NUR Trainings vom eingeloggten User
+async function loadTrainingsFromSupabase(){
+  if(!supabaseClient) return;
 
-  const old = _saveTimersById.get(id);
-  if (old) clearTimeout(old);
-
-  const t = setTimeout(async () => {
-    _saveTimersById.delete(id);
-    await saveTrainingToSupabase(tr);
-  }, delayMs);
-
-  _saveTimersById.set(id, t);
-}
-
-// ✅ ONE mutation helper: JEDES Update läuft hierdurch
-function updateTraining(trainingId, mutatorFn) {
-  const idx = trainings.findIndex(t => t.id === trainingId);
-  if (idx < 0) return;
-
-  const tr = trainings[idx];
-
-  // mutieren
-  mutatorFn(tr);
-
-  // immer anfassen + lokal speichern
-  _touchTraining(tr);
-  trainings[idx] = tr;
-
-  saveJSON(LS.trainings, trainings);
-
-  // UI aktualisieren
-  render();
-
-  // Supabase Save (debounced)
-  queueSaveTraining(tr);
-}
-
-async function loadTrainingsFromSupabase() {
-  if (!supabaseClient) return;
+  const user = await sbUser();
+  if(!user) return;
 
   const { data, error } = await supabaseClient
     .from("trainings")
     .select("*")
-    .order("created_at", { ascending: false });
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
 
-  if (error) {
+  if(error){
     console.warn("Load failed:", error);
     return;
   }
 
-  trainings = data.map(t => ({
+  trainings = (data || []).map(t => ({
     id: t.id,
     name: t.title,
+    category: t.category ?? null,
     items: t.frames || [],
-    createdAt: new Date(t.created_at).getTime(),
+    createdAt: t.created_at ? new Date(t.created_at).getTime() : Date.now(),
     updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : Date.now()
   }));
 
+  // lokal spiegeln (damit offline was da ist)
+  saveJSON(LS.trainings, trainings);
+
   render();
-}
-
-async function saveTrainingToSupabase(tr) {
-  if (!supabaseClient) return;
-
-  const { data: uData } = await supabaseClient.auth.getUser();
-  const user = uData?.user;
-  if (!user) return;
-
-  const row = {
-    id: tr.id,                               // uuid
-    user_id: user.id,                        // uuid
-    title: tr.name || "Training",            // text
-    category: tr.category ?? null,           // text (optional)
-    frames: tr.items ?? [],                  // jsonb
-    updated_at: new Date().toISOString(),    // timestamptz
-    data: tr                                // jsonb (Backup, optional)
-  };
-
-  const { error } = await supabaseClient
-    .from("trainings")
-    .upsert(row);
-
-  if (error) console.warn("Save failed:", error);
-  else console.log("Saved to Supabase ✅", row.id);
 }
 
 let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
@@ -1876,12 +1794,8 @@ async function addExerciseToTraining(trainingId, exerciseId){
   trainings[idx] = tr;
   saveJSON(LS.trainings, trainings);
 
-  // ✅ in Supabase speichern (damit frames/items mitkommen)
-  try {
-    await saveTrainingToSupabase(tr);
-  } catch (e) {
-    console.warn("saveTrainingToSupabase failed", e);
-  }
+  queueSaveTraining(tr);
+
 }
 
 /* ======================
@@ -1907,12 +1821,6 @@ $("btnNewTraining").addEventListener("click", async () => {
   setTab("trainings");
   render();
 
-  // optional in Supabase speichern (wenn eingeloggt + Client verfügbar)
-  try {
-    await saveTrainingToSupabase(tr);
-  } catch (e) {
-    console.warn("Supabase save failed:", e);
-  }
 });
 
 let currentTrainingId = null;
