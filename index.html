@@ -1259,6 +1259,124 @@ let favorites = new Set(loadJSON(LS.fav, []));
 let notesById = loadJSON(LS.notes, {});
 let trainings = [];
 
+// ======================================================
+// Supabase Persist Layer (Trainings) – ONE source of truth
+// ======================================================
+
+// kleine Queue, damit wir nicht bei jedem Klick 10 Upserts feuern
+const _saveTimersById = new Map();
+
+function _isLoggedIn() {
+  return !!supabaseClient;
+}
+
+async function _getUser() {
+  if (!supabaseClient) return null;
+  const { data, error } = await supabaseClient.auth.getUser();
+  if (error) return null;
+  return data?.user || null;
+}
+
+function _touchTraining(tr) {
+  tr.updatedAt = Date.now();
+  return tr;
+}
+
+// ✅ Upsert (speichert ALLES vom Training)
+async function saveTrainingToSupabase(tr) {
+  if (!supabaseClient) return;
+
+  const user = await _getUser();
+  if (!user) return;
+
+  // Das DB-Row-Format (passt zu deiner Tabelle: id, user_id, title, category, frames, updated_at, data)
+  const row = {
+    id: tr.id,
+    user_id: user.id,
+    title: tr.name ?? tr.title ?? "Training",
+    category: tr.category ?? null,
+
+    // WICHTIG: frames muss die Übungen enthalten (bei dir: items)
+    frames: Array.isArray(tr.items) ? tr.items : (Array.isArray(tr.frames) ? tr.frames : []),
+
+    // optional: ganzes Objekt als Backup
+    data: tr,
+
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabaseClient
+    .from("trainings")
+    .upsert(row);
+
+  if (error) {
+    console.warn("Supabase save failed:", error);
+  } else {
+    console.log("Saved training to Supabase ✅", row.id);
+  }
+}
+
+// ✅ Delete (löscht Training)
+async function deleteTrainingFromSupabase(trainingId) {
+  if (!supabaseClient) return;
+
+  const user = await _getUser();
+  if (!user) return;
+
+  const { error } = await supabaseClient
+    .from("trainings")
+    .delete()
+    .eq("id", trainingId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.warn("Supabase delete failed:", error);
+  } else {
+    console.log("Deleted training from Supabase ✅", trainingId);
+  }
+}
+
+// ✅ Debounced Save: ruft saveTrainingToSupabase erst nach kurzer Pause auf
+function queueSaveTraining(tr, delayMs = 250) {
+  if (!supabaseClient) return;
+
+  const id = tr?.id;
+  if (!id) return;
+
+  const old = _saveTimersById.get(id);
+  if (old) clearTimeout(old);
+
+  const t = setTimeout(async () => {
+    _saveTimersById.delete(id);
+    await saveTrainingToSupabase(tr);
+  }, delayMs);
+
+  _saveTimersById.set(id, t);
+}
+
+// ✅ ONE mutation helper: JEDES Update läuft hierdurch
+function updateTraining(trainingId, mutatorFn) {
+  const idx = trainings.findIndex(t => t.id === trainingId);
+  if (idx < 0) return;
+
+  const tr = trainings[idx];
+
+  // mutieren
+  mutatorFn(tr);
+
+  // immer anfassen + lokal speichern
+  _touchTraining(tr);
+  trainings[idx] = tr;
+
+  saveJSON(LS.trainings, trainings);
+
+  // UI aktualisieren
+  render();
+
+  // Supabase Save (debounced)
+  queueSaveTraining(tr);
+}
+
 async function loadTrainingsFromSupabase() {
   if (!supabaseClient) return;
 
@@ -1739,15 +1857,31 @@ $("addCreate").addEventListener("click", ()=>{
   render();
 });
 
-function addExerciseToTraining(trainingId, exerciseId){
-  const idx = trainings.findIndex(t=>t.id===trainingId);
-  if(idx<0) return;
+async function addExerciseToTraining(trainingId, exerciseId){
+  const idx = trainings.findIndex(t => t.id === trainingId);
+  if (idx < 0) return;
+
   const tr = trainings[idx];
-  tr.items = tr.items || [];
+
+  // sicherstellen, dass items existiert
+  tr.items = Array.isArray(tr.items) ? tr.items : [];
+
+  // Übung hinzufügen
   tr.items.push({ exerciseId, addedAt: Date.now() });
+
+  // updatedAt setzen
   tr.updatedAt = Date.now();
-  trainings[idx]=tr;
+
+  // lokal speichern (UI reagiert sofort)
+  trainings[idx] = tr;
   saveJSON(LS.trainings, trainings);
+
+  // ✅ in Supabase speichern (damit frames/items mitkommen)
+  try {
+    await saveTrainingToSupabase(tr);
+  } catch (e) {
+    console.warn("saveTrainingToSupabase failed", e);
+  }
 }
 
 /* ======================
