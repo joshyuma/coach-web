@@ -1,4 +1,587 @@
-<script>
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>Coach Übungen</title>
+  <meta name="theme-color" content="#ff7a00" />
+  <style>
+    :root{
+      --bg:#0b1220;
+      --panel:#0f1a30;
+      --card:#101e38;
+      --card2:#0e1a33;
+      --text:#eef3ff;
+      --muted:#97a7c4;
+      --line:rgba(255,255,255,.08);
+      --shadow: 0 18px 50px rgba(0,0,0,.35);
+      --orange:#ff7a00;
+      --orange2:#ffb25a;
+      --good:#2dd4bf;
+      --danger:#fb7185;
+      --radius:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+      background:
+        radial-gradient(900px 520px at 15% -10%, rgba(255,122,0,.25), transparent 60%),
+        radial-gradient(700px 380px at 110% 0%, rgba(255,178,90,.18), transparent 55%),
+        radial-gradient(700px 420px at 50% 120%, rgba(45,212,191,.10), transparent 55%),
+        var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Layout */
+    .app{
+      max-width: 980px;
+      margin: 0 auto;
+      padding: env(safe-area-inset-top) 14px calc(14px + env(safe-area-inset-bottom));
+      min-height: 100%;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+
+    /* Top bar */
+    header{
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      padding: 10px 0 8px;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(to bottom, rgba(11,18,32,.92), rgba(11,18,32,.62));
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    .topbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .logo{
+      width:40px;height:40px;border-radius:14px;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      box-shadow: 0 18px 40px rgba(255,122,0,.28);
+      flex:0 0 auto;
+      position:relative;
+    }
+    .logo:after{
+      content:"";
+      position:absolute; inset:10px;
+      border-radius:10px;
+      background: rgba(255,255,255,.18);
+      transform: rotate(18deg);
+    }
+    .titlewrap{min-width:0}
+    .title{
+      margin:0;
+      font-size:15px;
+      font-weight:950;
+      letter-spacing:.2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .subtitle{
+      margin:2px 0 0;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .hActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{
+      appearance:none;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-weight:900;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{
+      border-color: transparent;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      box-shadow: 0 18px 40px rgba(255,122,0,.25);
+      color:#1a1208;
+    }
+    .btn.ghost{
+      background: rgba(255,122,0,.10);
+      border-color: rgba(255,122,0,.22);
+      box-shadow:none;
+      color: #ffd9b3;
+    }
+    .btn.danger{
+      background: rgba(251,113,133,.10);
+      border-color: rgba(251,113,133,.22);
+      box-shadow:none;
+      color: #ffd1d9;
+    }
+
+    /* Content */
+    main{
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      padding-bottom: 72px; /* space for bottom tabs */
+    }
+
+    .panel{
+      background: linear-gradient(180deg, rgba(16,30,56,.78), rgba(16,30,56,.55));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .panelHead{
+      padding: 12px 12px 10px;
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(16,30,56,.92), rgba(16,30,56,.62));
+    }
+    .panelHead h2{margin:0;font-size:13px;font-weight:950;letter-spacing:.2px}
+    .panelHead p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+    .panelBody{padding:12px}
+
+    .field{
+      display:flex; gap:10px; align-items:center;
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+    }
+    .field input{
+      width:100%;
+      border:0; outline:none;
+      background: transparent;
+      color: var(--text);
+      font-size:14px;
+    }
+    .field .k{
+      font-weight:900;
+      color: rgba(255,255,255,.72);
+      font-size:12px;
+      padding: 6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+    }
+
+    .chips{
+      display:flex; flex-wrap:wrap; gap:8px;
+      margin-top: 10px;
+    }
+    .chip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.05);
+      font-weight:950;
+      font-size:12px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .chip[data-on="1"]{
+      border-color: rgba(255,122,0,.40);
+      background: rgba(255,122,0,.12);
+      color: #ffe5c7;
+    }
+    .chip .dot{
+      width:10px;height:10px;border-radius:50%;
+      background: rgba(255,255,255,.18);
+    }
+    .chip[data-on="1"] .dot{
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+    }
+
+    .list{display:flex;flex-direction:column;gap:10px}
+    .card{
+      display:flex; gap:12px; align-items:stretch; justify-content:space-between;
+      padding:12px;
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.04));
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 16px 40px rgba(0,0,0,.28);
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .thumb{
+      width:64px; height:64px;
+      border-radius: 14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.20);
+      flex:0 0 auto;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .thumb .ph{font-size:11px;color:var(--muted);text-align:center;padding:6px;line-height:1.2}
+    .meta{min-width:0;flex:1}
+    .meta .t{
+      margin:0;
+      font-size:14px;
+      font-weight:950;
+      line-height:1.2;
+    }
+    .meta .s{
+      margin:7px 0 0;
+      display:flex; gap:8px; flex-wrap:wrap;
+      color: var(--muted);
+      font-size:12px;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      padding: 6px 10px;
+      border-radius:999px;
+      background: rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.10);
+      color: rgba(255,255,255,.78);
+      font-weight:900;
+      font-size:11px;
+    }
+    .iconbtn{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border-radius:999px;
+      padding: 10px 12px;
+      min-width:44px;
+      text-align:center;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      flex:0 0 auto;
+    }
+    .iconbtn[data-on="1"]{
+      border-color: rgba(255,122,0,.40);
+      background: rgba(255,122,0,.14);
+      color:#ffe5c7;
+    }
+    .empty{
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px dashed rgba(255,255,255,.16);
+      background: rgba(0,0,0,.16);
+      color: var(--muted);
+      font-size:13px;
+      line-height:1.35;
+    }
+
+    /* Bottom tab bar (iPhone friendly) */
+    .tabs{
+      position: fixed;
+      left:0; right:0;
+      bottom: 0;
+      padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(11,18,32,.92), rgba(11,18,32,.65));
+      border-top: 1px solid rgba(255,255,255,.07);
+      backdrop-filter: blur(14px);
+      z-index: 30;
+    }
+    .tabRow{
+      max-width: 980px;
+      margin: 0 auto;
+      display:flex; gap:10px;
+    }
+    .tab{
+      flex:1;
+      border-radius: 16px;
+      padding: 12px 10px;
+      text-align:center;
+      font-weight:1000;
+      font-size:12px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.05);
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      color: rgba(255,255,255,.84);
+    }
+    .tab[data-on="1"]{
+      border-color: transparent;
+      background: linear-gradient(135deg,var(--orange),var(--orange2));
+      color:#1a1208;
+      box-shadow: 0 18px 40px rgba(255,122,0,.20);
+    }
+
+    /* Modal */
+    .backdrop{
+      position: fixed;
+      inset:0;
+      background: rgba(0,0,0,.55);
+      display:none;
+      align-items:flex-end;
+      justify-content:center;
+      padding: 12px;
+      z-index: 60;
+    }
+    .backdrop[data-open="1"]{display:flex}
+    .modal{
+      width: min(980px, 100%);
+      max-height: 88vh;
+      background: linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 22px;
+      box-shadow: 0 35px 90px rgba(0,0,0,.55);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+    .mHead{
+      padding: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
+      background: linear-gradient(135deg, rgba(255,122,0,.12), rgba(16,30,56,.88) 55%);
+    }
+    .mHead h3{margin:0;font-size:16px;font-weight:1000}
+    .mSub{margin:6px 0 0;display:flex;gap:8px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+    .mBody{padding:12px;overflow:auto}
+    .mRow{display:flex;gap:8px;flex-wrap:wrap}
+    .close{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 10px 12px;
+      cursor:pointer;
+      font-weight:1000;
+      min-width:44px;
+    }
+    .split{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+    .preview{
+      border-radius: 18px;
+      overflow:hidden;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      box-shadow: 0 18px 45px rgba(0,0,0,.30);
+    }
+    .preview img{width:100%;height:auto;display:block;border-bottom:1px solid rgba(255,255,255,.08)}
+    textarea{
+      width:100%;
+      min-height: 110px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.18);
+      color: var(--text);
+      padding: 12px;
+      outline:none;
+      resize: vertical;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .note{
+      margin-top:10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,122,0,.20);
+      background: rgba(255,122,0,.10);
+      color: #ffe5c7;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .err{
+      margin-top:10px;
+      padding: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(251,113,133,.25);
+      background: rgba(251,113,133,.10);
+      color: #ffd1d9;
+      font-size:13px;
+      line-height:1.35;
+      display:none;
+    }
+
+    /* iPhone first tweaks */
+    @media (min-width: 860px){
+      .split{grid-template-columns: 1.1fr 1fr}
+      main{padding-bottom: 86px;}
+      .thumb{width:72px;height:72px}
+    }
+    code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+  </style>
+  <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+  <div class="app">
+    <header>
+      <div class="topbar">
+        <div class="brand">
+          <div class="logo" aria-hidden="true"></div>
+          <div class="titlewrap">
+            <p class="title">Coach Übungen</p>
+            <p class="subtitle" id="subline">Kategorien nach Inhaltsverzeichnis • Trainings • PDF Export</p>
+          </div>
+        </div>
+        <div class="hActions">
+          <button class="btn" id="btnExportData">Daten</button>
+          <button class="btn" id="btnOcr">OCR</button>
+          <button class="btn danger" id="btnReset">Reset</button>
+          <button class="btn" id="btnLogin">Login</button>
+          <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
+          <span id="authInfo"></span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <h2 id="leftTitle">Suche & Filter</h2>
+            <p id="leftSub">Treffer: <span id="hitCount">0</span></p>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn primary" id="btnNewTraining">+ Training</button>
+          </div>
+        </div>
+        <div class="panelBody">
+          <div class="field">
+            <span class="k">⌕</span>
+            <input id="search" type="text" placeholder="Suche (Name, 1-on-1, 3-on-3, ...)" autocomplete="off" />
+          </div>
+          <div class="chips" id="chips"></div>
+        
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panelHead">
+          <div>
+            <h2 id="rightTitle">Übungen</h2>
+            <p id="rightSub">Tippe eine Übung an → Vorschau → zu Training / Favorit</p>
+          </div>
+        </div>
+        <div class="panelBody">
+          <div class="list" id="list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Bottom Tabs -->
+  <div class="tabs">
+    <div class="tabRow">
+      <button class="tab" id="tabExercises" data-on="1">Übungen</button>
+      <button class="tab" id="tabTrainings" data-on="0">Trainings</button>
+      <button class="tab" id="tabFavs" data-on="0">Favoriten</button>
+    </div>
+  </div>
+
+  <!-- Exercise Modal -->
+  <div class="backdrop" id="exBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3 id="exTitle">Übung</h3>
+          <div class="mSub" id="exMeta"></div>
+        </div>
+        <button class="close" id="exClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn" id="exFavBtn">☆ Favorit</button>
+          <button class="btn primary" id="exAddBtn">＋ Zu Training</button>
+          <button class="btn ghost" id="exOpenShots">🖼️ Bilder öffnen</button>
+        </div>
+
+        <div class="split">
+          <div class="preview" id="exPreview"></div>
+          <div>
+            <div class="pill" style="display:inline-flex;margin-bottom:8px">📝 Notizen (optional)</div>
+            <textarea id="exNotes" placeholder="Coaching Notes…"></textarea>
+            <div class="mRow" style="margin-top:10px">
+              <button class="btn primary" id="exSaveNotes">Notizen speichern</button>
+              <button class="btn" id="exEditCat">Kategorie ändern</button>
+            </div>
+            <div class="err" id="exErr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add to Training -->
+  <div class="backdrop" id="addBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3>Zu welchem Training?</h3>
+          <div class="mSub" id="addMeta"></div>
+        </div>
+        <button class="close" id="addClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn primary" id="addCreate">+ Neues Training</button>
+        </div>
+        <div style="height:10px"></div>
+        <div class="list" id="addList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training Editor -->
+  <div class="backdrop" id="trBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="mHead">
+        <div>
+          <h3 id="trTitle">Training</h3>
+          <div class="mSub" id="trMeta"></div>
+        </div>
+        <button class="close" id="trClose">✕</button>
+      </div>
+      <div class="mBody">
+        <div class="mRow">
+          <button class="btn primary" id="trExportPdf">⬇ Export als PDF</button>
+          <button class="btn" id="trRename">Umbenennen</button>
+          <button class="btn" id="trDuplicate">Duplizieren</button>
+          <button class="btn danger" id="trDelete">Löschen</button>
+        </div>
+        <div class="note" style="margin-top:10px">
+          PDF-Export fügt <b>alle Screenshots</b> der Übungen in <b>eine neue PDF</b> ein (inkl. Notizen).
+        </div>
+        <div style="height:10px"></div>
+        
+        <div class="list" id="trList"></div>
+        <div class="empty" id="trEmpty" style="display:none">Keine Übungen im Training.</div>
+        <div class="note" style="margin-top:10px">
+          <b>Offline PDF Export:</b> Lege <code>jspdf.umd.min.js</code> in <code>assets/libs/</code>.
+        </div>
+      </div>
+    </div>
+  </div>
+
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+ <script>
 "use strict";
 
 /* ================= PASSWORD ================= */
@@ -442,3 +1025,5 @@ function render(){
   await loadTrainingsFromSupabase();
 })();
 </script>
+</body>
+</html>
