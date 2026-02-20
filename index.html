@@ -587,6 +587,7 @@ const pw = prompt("Passwort eingeben:");
 if (pw !== "AndiObst42!") {
   document.body.innerHTML = "";
   alert("Falsches Passwort");
+  throw new Error("STOP"); // ✅ stoppt das Script wirklich
 }
 
 // =========================
@@ -1244,8 +1245,7 @@ function sortByNumberSuffix(a,b){
   return na - nb;
 }
 
-function nowId(){
-  function nowId() {
+function nowId() {
   // echte UUID für Supabase
   if (crypto?.randomUUID) return crypto.randomUUID();
 
@@ -1262,7 +1262,6 @@ function nowId(){
     s4() + "-" +
     s4() + s4() + s4()
   );
-}
 }
 
 /* =========================
@@ -1317,24 +1316,43 @@ async function sbUser(){
 async function saveTrainingToSupabase(tr){
   if(!supabaseClient) return;
 
-  const user = await sbUser();
-  if(!user) return;
+  const { data: uData, error: uErr } = await supabaseClient.auth.getUser();
+  const user = uData?.user;
+  if(uErr || !user) return;
 
   const row = {
-    id: tr.id,
-    user_id: user.id,
-    title: tr.name || "Training",
-    category: tr.category ?? null,
-    frames: Array.isArray(tr.items) ? tr.items : [],
+    id: tr.id,                          // uuid
+    user_id: user.id,                   // uuid
+    title: tr.name || "Training",       // text
+    category: tr.category ?? null,      // text
+    frames: Array.isArray(tr.items) ? tr.items : [],  // jsonb
     updated_at: new Date().toISOString(),
     data: tr
   };
 
   const { error } = await supabaseClient
     .from("trainings")
-    .upsert(row);
+    .upsert(row, { onConflict: "id" });
 
   if(error) console.warn("Supabase save failed:", error);
+}
+
+function queueSaveTraining(tr, delayMs = 250) {
+  if (!supabaseClient || !tr?.id) return;
+
+  const old = _saveTimersById.get(tr.id);
+  if (old) clearTimeout(old);
+
+  const t = setTimeout(async () => {
+    _saveTimersById.delete(tr.id);
+    try {
+      await saveTrainingToSupabase(tr);
+    } catch (e) {
+      console.warn("saveTrainingToSupabase failed:", e);
+    }
+  }, delayMs);
+
+  _saveTimersById.set(tr.id, t);
 }
 
 async function deleteTrainingFromSupabase(trainingId){
@@ -1810,6 +1828,7 @@ $("addCreate").addEventListener("click", ()=>{
   const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
   trainings = [tr, ...trainings];
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
   renderAddList();
   render();
 });
@@ -1831,11 +1850,11 @@ async function addExerciseToTraining(trainingId, exerciseId){
 
   trainings[idx] = tr;
   saveJSON(LS.trainings, trainings);
-
+// 👉 Supabase sync
+  queueSaveTraining(tr);
+  
   render();
 
-  // 👉 Supabase sync
-  queueSaveTraining(tr);
 }
 
 /* ======================
@@ -1858,6 +1877,7 @@ $("btnNewTraining").addEventListener("click", async () => {
   // lokal sofort anlegen (damit UI direkt reagiert)
   trainings = [tr, ...trainings];
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
   setTab("trainings");
   render();
 
@@ -1979,6 +1999,7 @@ $("trRename").addEventListener("click", ()=>{
 $("trDuplicate").addEventListener("click", ()=>{
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
+
   const copy = {
     id: nowId(),
     name: tr.name + " (Kopie)",
@@ -1986,21 +2007,29 @@ $("trDuplicate").addEventListener("click", ()=>{
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
+
   trainings = [copy, ...trainings];
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
+
+  // ✅ Supabase: die KOPIE speichern
+  queueSaveTraining(copy);
+
   alert("Dupliziert ✅");
   openTraining(copy.id);
   render();
 });
 
-$("trDelete").addEventListener("click", ()=>{
+$("trDelete").addEventListener("click", async ()=>{
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
   if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
+
   trainings = trainings.filter(t=>t.id!==currentTrainingId);
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
+
+  // ✅ Supabase wirklich löschen
+  await deleteTrainingFromSupabase(tr.id);
+
   closeTraining();
   render();
 });
@@ -2234,10 +2263,6 @@ document.addEventListener("keydown",(e)=>{
 
 })();
 
-(async () => {
-  await loadTrainingsFromSupabase();
-  
-})();
 </script>
 </body>
 </html>
