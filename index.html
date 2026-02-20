@@ -589,6 +589,7 @@ if (pw !== "AndiObst42!") {
   document.body.innerHTML = "";
   alert("Falsches Passwort");
 }
+
 // =========================
 // Supabase Init (safe, darf NICHT crashen)
 // =========================
@@ -618,31 +619,48 @@ const authInfo = document.getElementById("authInfo");
 
 if (supabaseClient) {
 
-  btnLogin.onclick = async () => {
-    const email = prompt("Email:");
-    if (!email) return;
+  function getRedirectTo() {
+  const u = new URL(window.location.href);
+  u.hash = "";
+  u.search = "";
+  return u.toString();
+}
 
-    const { error } = await supabaseClient.auth.signInWithOtp({ email });
+btnLogin.onclick = async () => {
+  const email = prompt("Email:");
+  if (!email) return;
 
-    if (error) alert(error.message);
-    else alert("Login-Link wurde per Email gesendet 📩");
-  };
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: getRedirectTo()
+    }
+  });
+
+  if (error) alert(error.message);
+  else alert("Login-Link wurde per Email gesendet ✉️");
+};
 
   btnLogout.onclick = async () => {
     await supabaseClient.auth.signOut();
   };
 
-  supabaseClient.auth.onAuthStateChange((event, session) => {
-    if (session?.user) {
-      btnLogin.style.display = "none";
-      btnLogout.style.display = "inline-block";
-      authInfo.textContent = session.user.email;
-    } else {
-      btnLogin.style.display = "inline-block";
-      btnLogout.style.display = "none";
-      authInfo.textContent = "";
-    }
-  });
+  (async () => {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    btnLogin.style.display = "none";
+    btnLogout.style.display = "inline-block";
+    authInfo.textContent = data.session.user.email;
+
+    // URL clean (remove #access_token)
+    history.replaceState({}, document.title, location.pathname);
+  } else {
+    btnLogin.style.display = "inline-block";
+    btnLogout.style.display = "none";
+    authInfo.textContent = "";
+  }
+})();
 }
 
 /* =========================
@@ -2087,9 +2105,9 @@ $("btnReset").addEventListener("click", ()=>{
 });
 
 $("btnOcr").addEventListener("click", async ()=>{
-  alert("OCR startet. Das dauert einmalig.");
+  alert("OCR Download startet.");
   await buildOcrIndex(EXERCISES);
-  alert("OCR fertig – Suche kann jetzt Text aus Bildern.");
+  alert("OCR fertig gedownloaded.");
   render();
 });
 
