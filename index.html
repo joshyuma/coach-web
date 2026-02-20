@@ -426,6 +426,7 @@
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
   <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -443,6 +444,9 @@
           <button class="btn" id="btnExportData">Daten</button>
           <button class="btn" id="btnOcr">OCR</button>
           <button class="btn danger" id="btnReset">Reset</button>
+          <button class="btn" id="btnLogin">Login</button>
+          <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
+          <span id="authInfo"></span>
         </div>
       </div>
     </header>
@@ -565,6 +569,7 @@
           PDF-Export fügt <b>alle Screenshots</b> der Übungen in <b>eine neue PDF</b> ein (inkl. Notizen).
         </div>
         <div style="height:10px"></div>
+        
         <div class="list" id="trList"></div>
         <div class="empty" id="trEmpty" style="display:none">Keine Übungen im Training.</div>
         <div class="note" style="margin-top:10px">
@@ -574,15 +579,72 @@
     </div>
   </div>
 
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <script>
 "use strict";
-    
+
 const pw = prompt("Passwort eingeben:");
 if (pw !== "AndiObst42!") {
   document.body.innerHTML = "";
   alert("Falsches Passwort");
 }
-  
+// =========================
+// Supabase Init (safe, darf NICHT crashen)
+// =========================
+let supabaseClient = null;
+
+try {
+  const SUPABASE_URL = "https://yvzneuettfhnejlpmuck.supabase.co";
+  const SUPABASE_ANON_KEY = " sb_publishable_R8JlQ1KY0EKLZjHZbkXTng_TUFbWbUo";
+
+  if (!window.supabase?.createClient) {
+    throw new Error("Supabase library not loaded (window.supabase.createClient fehlt)");
+  }
+
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  console.log("Supabase ready ✅", SUPABASE_URL);
+} catch (e) {
+  console.warn("Supabase disabled – App läuft lokal weiter ✅", e);
+}
+
+// =========================
+// AUTH UI
+// =========================
+
+const btnLogin = document.getElementById("btnLogin");
+const btnLogout = document.getElementById("btnLogout");
+const authInfo = document.getElementById("authInfo");
+
+if (supabaseClient) {
+
+  btnLogin.onclick = async () => {
+    const email = prompt("Email:");
+    if (!email) return;
+
+    const { error } = await supabaseClient.auth.signInWithOtp({ email });
+
+    if (error) alert(error.message);
+    else alert("Login-Link wurde per Email gesendet 📩");
+  };
+
+  btnLogout.onclick = async () => {
+    await supabaseClient.auth.signOut();
+  };
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      btnLogin.style.display = "none";
+      btnLogout.style.display = "inline-block";
+      authInfo.textContent = session.user.email;
+    } else {
+      btnLogin.style.display = "inline-block";
+      btnLogout.style.display = "none";
+      authInfo.textContent = "";
+    }
+  });
+}
+
 /* =========================
    OCR ADDON
 ========================= */
@@ -1177,7 +1239,57 @@ let activeTab = loadJSON(LS.tab, "exercises"); // exercises|trainings|favs
 let selectedCats = loadJSON(LS.cats, []);      // category filters
 let favorites = new Set(loadJSON(LS.fav, []));
 let notesById = loadJSON(LS.notes, {});
-let trainings = loadJSON(LS.trainings, []);
+let trainings = [];
+
+async function loadTrainingsFromSupabase() {
+  if (!supabaseClient) return;
+
+  const { data, error } = await supabaseClient
+    .from("trainings")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Load failed:", error);
+    return;
+  }
+
+  trainings = data.map(t => ({
+    id: t.id,
+    name: t.title,
+    items: t.frames || [],
+    createdAt: new Date(t.created_at).getTime(),
+    updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : Date.now()
+  }));
+
+  render();
+}
+
+async function saveTrainingToSupabase(tr) {
+  if (!supabaseClient) return;
+
+  const { data: uData } = await supabaseClient.auth.getUser();
+  const user = uData?.user;
+  if (!user) return;
+
+  const row = {
+    id: tr.id,                               // uuid
+    user_id: user.id,                        // uuid
+    title: tr.name || "Training",            // text
+    category: tr.category ?? null,           // text (optional)
+    frames: tr.items ?? [],                  // jsonb
+    updated_at: new Date().toISOString(),    // timestamptz
+    data: tr                                // jsonb (Backup, optional)
+  };
+
+  const { error } = await supabaseClient
+    .from("trainings")
+    .upsert(row);
+
+  if (error) console.warn("Save failed:", error);
+  else console.log("Saved to Supabase ✅", row.id);
+}
+
 let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
 let EXERCISES = []; // loaded from manifest/listing
 
@@ -1620,16 +1732,35 @@ function addExerciseToTraining(trainingId, exerciseId){
   saveJSON(LS.trainings, trainings);
 }
 
-/* =========================
+/* ======================
    Training CRUD + Editor
-========================= */
-$("btnNewTraining").addEventListener("click", ()=>{
-  const name = prompt("Name für neues Training:", "Training " + (trainings.length+1));
-  if(!name) return;
-  const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
+====================== */
+
+$("btnNewTraining").addEventListener("click", async () => {
+  const name = prompt("Name für neues Training:", "Training " + (trainings.length + 1));
+  if (!name) return;
+
+  // neues Training-Objekt (lokal)
+  const tr = {
+    id: nowId(),
+    name: name.trim(),
+    items: [],
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  // lokal sofort anlegen (damit UI direkt reagiert)
   trainings = [tr, ...trainings];
   saveJSON(LS.trainings, trainings);
   setTab("trainings");
+  render();
+
+  // optional in Supabase speichern (wenn eingeloggt + Client verfügbar)
+  try {
+    await saveTrainingToSupabase(tr);
+  } catch (e) {
+    console.warn("Supabase save failed:", e);
+  }
 });
 
 let currentTrainingId = null;
@@ -1996,6 +2127,12 @@ document.addEventListener("keydown",(e)=>{
 
   renderChips();
   setTab(activeTab);
+
+})();
+
+(async () => {
+  await loadTrainingsFromSupabase();
+  
 })();
 </script>
 </body>
