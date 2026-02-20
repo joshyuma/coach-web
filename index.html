@@ -609,57 +609,82 @@ try {
 }
 
 // =========================
-// AUTH UI
+// AUTH UI (FIXED + LIVE UPDATES)
 // =========================
-
 const btnLogin = document.getElementById("btnLogin");
 const btnLogout = document.getElementById("btnLogout");
 const authInfo = document.getElementById("authInfo");
 
-if (supabaseClient) {
-
-  function getRedirectTo() {
+function getRedirectTo() {
   const u = new URL(window.location.href);
   u.hash = "";
+  // wichtig: query behalten ist optional – ich entferne sie wie bei dir
   u.search = "";
   return u.toString();
 }
 
-btnLogin.onclick = async () => {
-  const email = prompt("Email:");
-  if (!email) return;
+async function updateAuthUI(session) {
+  const isIn = !!session;
 
-  const { error } = await supabaseClient.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: getRedirectTo()
+  btnLogin.style.display = isIn ? "none" : "inline-block";
+  btnLogout.style.display = isIn ? "inline-block" : "none";
+  authInfo.textContent = isIn ? (session.user?.email || "") : "";
+
+  // Wenn du willst: URL von Tokens bereinigen
+  // (wenn Supabase nach Magic Link #access_token setzt)
+  if (location.hash && location.hash.includes("access_token")) {
+    history.replaceState({}, document.title, location.pathname);
+  }
+}
+
+if (supabaseClient) {
+  // Login
+  btnLogin.addEventListener("click", async () => {
+    const email = prompt("Email:");
+    if (!email) return;
+
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: getRedirectTo() }
+    });
+
+    if (error) alert(error.message);
+    else alert("Login-Link wurde per Email gesendet ✉️");
+  });
+
+  // Logout (mit Fehleranzeige)
+  btnLogout.addEventListener("click", async () => {
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) alert("Logout Fehler: " + error.message);
+  });
+
+  // ✅ LIVE: reagiert IMMER auf Login/Logout
+  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    await updateAuthUI(session);
+
+    // ✅ Nach Login: Trainings aus Supabase laden
+    if (session) {
+      try {
+        await loadTrainingsFromSupabase();
+      } catch (e) {
+        console.warn("loadTrainingsFromSupabase failed", e);
+      }
+    } else {
+      // ✅ Nach Logout: lokale Trainings laden (damit UI nicht „tot“ wirkt)
+      trainings = loadJSON(LS.trainings, []);
+      render();
     }
   });
 
-  if (error) alert(error.message);
-  else alert("Login-Link wurde per Email gesendet ✉️");
-};
-
-  btnLogout.onclick = async () => {
-    await supabaseClient.auth.signOut();
-  };
-
+  // Initialer Zustand beim Laden
   (async () => {
-  const { data } = await supabaseClient.auth.getSession();
+    const { data } = await supabaseClient.auth.getSession();
+    await updateAuthUI(data.session);
 
-  if (data.session) {
-    btnLogin.style.display = "none";
-    btnLogout.style.display = "inline-block";
-    authInfo.textContent = data.session.user.email;
-
-    // URL clean (remove #access_token)
-    history.replaceState({}, document.title, location.pathname);
-  } else {
-    btnLogin.style.display = "inline-block";
-    btnLogout.style.display = "none";
-    authInfo.textContent = "";
-  }
-})();
+    if (data.session) {
+      try { await loadTrainingsFromSupabase(); } catch (e) {}
+    }
+  })();
 }
 
 /* =========================
@@ -1220,7 +1245,24 @@ function sortByNumberSuffix(a,b){
 }
 
 function nowId(){
-  return "tr_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
+  function nowId() {
+  // echte UUID für Supabase
+  if (crypto?.randomUUID) return crypto.randomUUID();
+
+  // Fallback
+  const s4 = () =>
+    Math.floor((1 + Math.random()) * 0x10000)
+      .toString(16)
+      .substring(1);
+
+  return (
+    s4() + s4() + "-" +
+    s4() + "-" +
+    s4() + "-" +
+    s4() + "-" +
+    s4() + s4() + s4()
+  );
+}
 }
 
 /* =========================
@@ -1311,20 +1353,20 @@ async function deleteTrainingFromSupabase(trainingId){
 }
 
 
-// lädt NUR Trainings vom eingeloggten User
-async function loadTrainingsFromSupabase(){
-  if(!supabaseClient) return;
+async function loadTrainingsFromSupabase() {
+  if (!supabaseClient) return;
 
-  const user = await sbUser();
-  if(!user) return;
+  const { data: uData, error: uErr } = await supabaseClient.auth.getUser();
+  const user = uData?.user;
+  if (uErr || !user) return;
 
   const { data, error } = await supabaseClient
     .from("trainings")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", user.id)                 // ✅ NUR eigener User
     .order("updated_at", { ascending: false });
 
-  if(error){
+  if (error) {
     console.warn("Load failed:", error);
     return;
   }
@@ -1332,15 +1374,12 @@ async function loadTrainingsFromSupabase(){
   trainings = (data || []).map(t => ({
     id: t.id,
     name: t.title,
-    category: t.category ?? null,
     items: t.frames || [],
     createdAt: t.created_at ? new Date(t.created_at).getTime() : Date.now(),
     updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : Date.now()
   }));
 
-  // lokal spiegeln (damit offline was da ist)
-  saveJSON(LS.trainings, trainings);
-
+  saveJSON(LS.trainings, trainings);  // optional aber hilfreich
   render();
 }
 
@@ -1777,25 +1816,26 @@ $("addCreate").addEventListener("click", ()=>{
 
 async function addExerciseToTraining(trainingId, exerciseId){
   const idx = trainings.findIndex(t => t.id === trainingId);
-  if (idx < 0) return;
+  if(idx < 0) return;
 
   const tr = trainings[idx];
 
-  // sicherstellen, dass items existiert
   tr.items = Array.isArray(tr.items) ? tr.items : [];
 
-  // Übung hinzufügen
-  tr.items.push({ exerciseId, addedAt: Date.now() });
+  tr.items.push({
+    exerciseId,
+    addedAt: Date.now()
+  });
 
-  // updatedAt setzen
   tr.updatedAt = Date.now();
 
-  // lokal speichern (UI reagiert sofort)
   trainings[idx] = tr;
   saveJSON(LS.trainings, trainings);
 
-  queueSaveTraining(tr);
+  render();
 
+  // 👉 Supabase sync
+  queueSaveTraining(tr);
 }
 
 /* ======================
@@ -1910,6 +1950,7 @@ function trainingAction(act, idx){
   tr.updatedAt = Date.now();
   trainings[tIdx]=tr;
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
 
   $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
     <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
@@ -1928,6 +1969,7 @@ $("trRename").addEventListener("click", ()=>{
   tr.updatedAt = Date.now();
   trainings[tIdx]=tr;
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
   $("trTitle").textContent = tr.name;
   $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
     <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
@@ -1946,6 +1988,7 @@ $("trDuplicate").addEventListener("click", ()=>{
   };
   trainings = [copy, ...trainings];
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
   alert("Dupliziert ✅");
   openTraining(copy.id);
   render();
@@ -1957,6 +2000,7 @@ $("trDelete").addEventListener("click", ()=>{
   if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
   trainings = trainings.filter(t=>t.id!==currentTrainingId);
   saveJSON(LS.trainings, trainings);
+  queueSaveTraining(tr);
   closeTraining();
   render();
 });
