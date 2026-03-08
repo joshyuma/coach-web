@@ -729,7 +729,7 @@ try {
 }
 
 // =========================
-// AUTH UI (FIXED + LIVE UPDATES)
+// AUTH UI (NO AUTO-LOGIN FROM OLD SESSION)
 // =========================
 const btnLogin = document.getElementById("btnLogin");
 const btnLogout = document.getElementById("btnLogout");
@@ -738,9 +738,17 @@ const authInfo = document.getElementById("authInfo");
 function getRedirectTo() {
   const u = new URL(window.location.href);
   u.hash = "";
-  // wichtig: query behalten ist optional – ich entferne sie wie bei dir
   u.search = "";
   return u.toString();
+}
+
+function isMagicLinkReturn() {
+  return (
+    location.hash.includes("access_token") ||
+    location.hash.includes("refresh_token") ||
+    location.hash.includes("type=") ||
+    location.search.includes("code=")
+  );
 }
 
 async function updateAuthUI(session) {
@@ -750,72 +758,104 @@ async function updateAuthUI(session) {
   btnLogout.style.display = isIn ? "inline-block" : "none";
   authInfo.textContent = isIn ? (session.user?.email || "") : "";
 
-  // Wenn du willst: URL von Tokens bereinigen
-  // (wenn Supabase nach Magic Link #access_token setzt)
-  if (location.hash && location.hash.includes("access_token")) {
+  // Magic-Link-Reste aus URL entfernen
+  if (
+    location.hash.includes("access_token") ||
+    location.hash.includes("refresh_token") ||
+    location.hash.includes("type=")
+  ) {
     history.replaceState({}, document.title, location.pathname);
   }
 }
 
-if (supabaseClient) {
-  // Login
-  btnLogin.addEventListener("click", async () => {
-    const emailInput = document.getElementById("loginEmail");
-const savedEmail = localStorage.getItem("coach_last_login_email") || "";
-if (emailInput && !emailInput.value && savedEmail) {
-  emailInput.value = savedEmail;
+async function showLoggedOutState() {
+  await updateAuthUI(null);
+  trainings = loadJSON(LS.trainings, []);
+  render();
 }
 
-const email = ((emailInput?.value || "").trim()) || prompt("Email:");
-if (!email) return;
+if (supabaseClient) {
+  // LOGIN
+  btnLogin.addEventListener("click", async () => {
+    const emailInput = document.getElementById("loginEmail");
+    const savedEmail = localStorage.getItem("coach_last_login_email") || "";
 
-localStorage.setItem("coach_last_login_email", email);
+    if (emailInput && !emailInput.value && savedEmail) {
+      emailInput.value = savedEmail;
+    }
+
+    const email = ((emailInput?.value || "").trim()) || prompt("Email:");
+    if (!email) return;
+
+    localStorage.setItem("coach_last_login_email", email);
 
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: getRedirectTo() }
     });
 
-    if (error) alert(error.message);
-    else alert("Login-Link wurde per Email gesendet ✉️");
-  });
-
-  // Logout (mit Fehleranzeige)
-  btnLogout.addEventListener("click", async () => {
-    const { error } = await supabaseClient.auth.signOut();
-    if (error) alert("Logout Fehler: " + error.message);
-  });
-
-  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-  await updateAuthUI(session);
-
-  if (session) {
-    try {
-      await loadTrainingsFromSupabase();
-    } catch (e) {
-      console.warn("loadTrainingsFromSupabase failed", e);
+    if (error) {
+      alert(error.message);
+    } else {
+      alert("Login-Link wurde per Email gesendet ✉️");
     }
-  } else {
-    authInfo.textContent = "";
-    btnLogin.style.display = "inline-block";
-    btnLogout.style.display = "none";
+  });
 
-    trainings = loadJSON(LS.trainings, []);
-    render();
-  }
-});
+  // LOGOUT
+  btnLogout.addEventListener("click", async () => {
+    const { error } = await supabaseClient.auth.signOut({ scope: "local" });
+    if (error) {
+      alert("Logout Fehler: " + error.message);
+      return;
+    }
 
-  // Initialer Zustand beim Laden
-(async () => {
-  // Website-Passwort ist NICHT gleich Supabase-Login
-  // Deshalb starten wir immer ausgeloggt
-  await supabaseClient.auth.signOut();
+    await showLoggedOutState();
+  });
 
-  await updateAuthUI(null);
+  // Reagiert auf Login / Logout
+  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+    if (session) {
+      await updateAuthUI(session);
 
-  trainings = loadJSON(LS.trainings, []);
-  render();
-})();
+      try {
+        await loadTrainingsFromSupabase();
+      } catch (e) {
+        console.warn("loadTrainingsFromSupabase failed", e);
+      }
+    } else {
+      await showLoggedOutState();
+    }
+  });
+
+  // Beim normalen Laden IMMER ausgeloggt starten.
+  // Nur wenn man wirklich über den Magic Link zurückkommt,
+  // darf die Session bestehen bleiben.
+  (async () => {
+    if (!isMagicLinkReturn()) {
+      try {
+        await supabaseClient.auth.signOut({ scope: "local" });
+      } catch (e) {
+        console.warn("Initial local signOut failed", e);
+      }
+
+      await showLoggedOutState();
+      return;
+    }
+
+    const { data } = await supabaseClient.auth.getSession();
+
+    if (data?.session) {
+      await updateAuthUI(data.session);
+
+      try {
+        await loadTrainingsFromSupabase();
+      } catch (e) {
+        console.warn("Initial loadTrainingsFromSupabase failed", e);
+      }
+    } else {
+      await showLoggedOutState();
+    }
+  })();
 }
 
 /* =========================
