@@ -430,6 +430,66 @@
 </head>
 
 <body>
+
+  <div id="loginGate" style="
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(11,18,32,.96);
+  padding:20px;
+">
+  <div style="
+    width:min(92vw,380px);
+    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:22px;
+    box-shadow:0 35px 90px rgba(0,0,0,.55);
+    padding:20px;
+  ">
+    <h3 style="margin:0 0 12px 0;">Coach Übungen</h3>
+    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
+      Passwort eingeben
+    </p>
+
+    <input
+      id="gatePassword"
+      type="password"
+      placeholder="Passwort"
+      autocomplete="current-password"
+      style="
+        width:100%;
+        padding:12px 14px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.06);
+        color:#eef3ff;
+        outline:none;
+        font-size:14px;
+        margin-bottom:12px;
+      "
+    />
+
+    <button
+      id="gateEnter"
+      style="
+        width:100%;
+        padding:12px 14px;
+        border-radius:999px;
+        border:0;
+        font-weight:900;
+        cursor:pointer;
+        background:linear-gradient(135deg,#ff7a00,#ffb25a);
+        color:#1a1208;
+      "
+    >
+      Enter
+    </button>
+  </div>
+</div>
+
   <div class="app">
     <header>
       <div class="topbar">
@@ -441,13 +501,32 @@
           </div>
         </div>
         <div class="hActions">
-          <button class="btn" id="btnExportData">Daten</button>
-          <button class="btn" id="btnOcr">OCR</button>
-          <button class="btn danger" id="btnReset">Reset</button>
-          <button class="btn" id="btnLogin">Login</button>
-          <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
-          <span id="authInfo"></span>
-        </div>
+  <button class="btn" id="btnExportData">Daten</button>
+  <button class="btn" id="btnOcr">OCR</button>
+  <button class="btn danger" id="btnReset">Reset</button>
+
+  <input
+    id="loginEmail"
+    type="email"
+    placeholder="E-Mail"
+    autocomplete="email"
+    inputmode="email"
+    style="
+      padding:10px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.06);
+      color:#eef3ff;
+      outline:none;
+      min-width:180px;
+      font-size:13px;
+    "
+  />
+
+  <button class="btn" id="btnLogin">Login</button>
+  <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
+  <span id="authInfo"></span>
+</div>
       </div>
     </header>
 
@@ -547,7 +626,7 @@
       </div>
     </div>
   </div>
-
+ 
   <!-- Training Editor -->
   <div class="backdrop" id="trBack" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true">
@@ -583,12 +662,52 @@
   <script>
 "use strict";
 
-const pw = prompt("Passwort eingeben:");
-if (pw !== "AndiObst42!") {
+const APP_PASSWORD = "AndiObst42!";
+
+function stopAppWithPasswordError() {
   document.body.innerHTML = "";
   alert("Falsches Passwort");
-  throw new Error("STOP"); // ✅ stoppt das Script wirklich
+  throw new Error("STOP");
 }
+
+function unlockAppGate() {
+  const gate = document.getElementById("loginGate");
+  if (gate) gate.style.display = "none";
+}
+
+function checkAppPassword(value) {
+  return (value || "") === APP_PASSWORD;
+}
+
+(function initPasswordGate() {
+  const gateInput = document.getElementById("gatePassword");
+  const gateBtn = document.getElementById("gateEnter");
+
+  // Später mit HTML-Overlay: echtes Passwortfeld statt prompt()
+  if (gateInput && gateBtn) {
+    gateBtn.addEventListener("click", () => {
+      if (checkAppPassword(gateInput.value)) {
+        unlockAppGate();
+      } else {
+        gateInput.value = "";
+        gateInput.focus();
+        alert("Falsches Passwort");
+      }
+    });
+
+    gateInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") gateBtn.click();
+    });
+
+    return;
+  }
+
+  // Übergang: solange der neue Body-Input noch nicht da ist
+  const pw = prompt("Passwort eingeben:");
+  if (!checkAppPassword(pw)) {
+    stopAppWithPasswordError();
+  }
+})();
 
 // =========================
 // Supabase Init (safe, darf NICHT crashen)
@@ -641,8 +760,16 @@ async function updateAuthUI(session) {
 if (supabaseClient) {
   // Login
   btnLogin.addEventListener("click", async () => {
-    const email = prompt("Email:");
-    if (!email) return;
+    const emailInput = document.getElementById("loginEmail");
+const savedEmail = localStorage.getItem("coach_last_login_email") || "";
+if (emailInput && !emailInput.value && savedEmail) {
+  emailInput.value = savedEmail;
+}
+
+const email = ((emailInput?.value || "").trim()) || prompt("Email:");
+if (!email) return;
+
+localStorage.setItem("coach_last_login_email", email);
 
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
