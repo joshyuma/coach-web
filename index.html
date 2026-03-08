@@ -430,66 +430,32 @@
 </head>
 
 <body>
-
   <div id="loginGate" style="
-  position:fixed;
-  inset:0;
-  z-index:9999;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:rgba(11,18,32,.96);
-  padding:20px;
+position:fixed;
+inset:0;
+background:#0b1220;
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:9999;
+flex-direction:column;
+gap:12px;
 ">
-  <div style="
-    width:min(92vw,380px);
-    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
-    border:1px solid rgba(255,255,255,.10);
-    border-radius:22px;
-    box-shadow:0 35px 90px rgba(0,0,0,.55);
-    padding:20px;
-  ">
-    <h3 style="margin:0 0 12px 0;">Coach Übungen</h3>
-    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
-      Passwort eingeben
-    </p>
 
-    <input
-      id="gatePassword"
-      type="password"
-      placeholder="Passwort"
-      autocomplete="current-password"
-      style="
-        width:100%;
-        padding:12px 14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.10);
-        background:rgba(255,255,255,.06);
-        color:#eef3ff;
-        outline:none;
-        font-size:14px;
-        margin-bottom:12px;
-      "
-    />
+<h2 style="color:white">Passwort</h2>
 
-    <button
-      id="gateEnter"
-      style="
-        width:100%;
-        padding:12px 14px;
-        border-radius:999px;
-        border:0;
-        font-weight:900;
-        cursor:pointer;
-        background:linear-gradient(135deg,#ff7a00,#ffb25a);
-        color:#1a1208;
-      "
-    >
-      Enter
-    </button>
-  </div>
+<input
+id="gatePassword"
+type="password"
+placeholder="Passwort eingeben"
+style="padding:12px;border-radius:8px;border:none;font-size:16px"
+/>
+
+<button id="gateEnter" style="padding:10px 16px;font-size:16px">
+Enter
+</button>
+
 </div>
-
   <div class="app">
     <header>
       <div class="topbar">
@@ -501,32 +467,15 @@
           </div>
         </div>
         <div class="hActions">
-  <button class="btn" id="btnExportData">Daten</button>
-  <button class="btn" id="btnOcr">OCR</button>
-  <button class="btn danger" id="btnReset">Reset</button>
-
-  <input
-    id="loginEmail"
-    type="email"
-    placeholder="E-Mail"
-    autocomplete="email"
-    inputmode="email"
-    style="
-      padding:10px 12px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.10);
-      background:rgba(255,255,255,.06);
-      color:#eef3ff;
-      outline:none;
-      min-width:180px;
-      font-size:13px;
-    "
-  />
-
-  <button class="btn" id="btnLogin">Login</button>
-  <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
-  <span id="authInfo"></span>
-</div>
+          <button class="btn" id="btnExportData">Daten</button>
+          <button class="btn" id="btnOcr">OCR</button>
+          <button class="btn danger" id="btnReset">Reset</button>
+          <button class="btn" id="btnLogin">Login</button>
+          <input id="loginEmail" type="email" placeholder="Email" style=" display:none;padding:10px;border-radius:8px;margin-left:8px;"
+/>
+          <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
+          <span id="authInfo"></span>
+        </div>
       </div>
     </header>
 
@@ -626,7 +575,7 @@
       </div>
     </div>
   </div>
- 
+
   <!-- Training Editor -->
   <div class="backdrop" id="trBack" aria-hidden="true">
     <div class="modal" role="dialog" aria-modal="true">
@@ -683,30 +632,25 @@ function checkAppPassword(value) {
   const gateInput = document.getElementById("gatePassword");
   const gateBtn = document.getElementById("gateEnter");
 
-  // Später mit HTML-Overlay: echtes Passwortfeld statt prompt()
-  if (gateInput && gateBtn) {
-    gateBtn.addEventListener("click", () => {
-      if (checkAppPassword(gateInput.value)) {
-        unlockAppGate();
-      } else {
-        gateInput.value = "";
-        gateInput.focus();
-        alert("Falsches Passwort");
-      }
-    });
-
-    gateInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") gateBtn.click();
-    });
-
+  if (!gateInput || !gateBtn) {
+    const pw = prompt("Passwort eingeben:");
+    if (!checkAppPassword(pw)) stopAppWithPasswordError();
     return;
   }
 
-  // Übergang: solange der neue Body-Input noch nicht da ist
-  const pw = prompt("Passwort eingeben:");
-  if (!checkAppPassword(pw)) {
-    stopAppWithPasswordError();
-  }
+  gateBtn.addEventListener("click", () => {
+    if (checkAppPassword(gateInput.value)) {
+      unlockAppGate();
+    } else {
+      gateInput.value = "";
+      gateInput.focus();
+      alert("Falsches Passwort");
+    }
+  });
+
+  gateInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") gateBtn.click();
+  });
 })();
 
 // =========================
@@ -729,7 +673,7 @@ try {
 }
 
 // =========================
-// AUTH UI (NO AUTO-LOGIN FROM OLD SESSION)
+// AUTH UI (FIXED + LIVE UPDATES)
 // =========================
 const btnLogin = document.getElementById("btnLogin");
 const btnLogout = document.getElementById("btnLogout");
@@ -738,17 +682,9 @@ const authInfo = document.getElementById("authInfo");
 function getRedirectTo() {
   const u = new URL(window.location.href);
   u.hash = "";
+  // wichtig: query behalten ist optional – ich entferne sie wie bei dir
   u.search = "";
   return u.toString();
-}
-
-function isMagicLinkReturn() {
-  return (
-    location.hash.includes("access_token") ||
-    location.hash.includes("refresh_token") ||
-    location.hash.includes("type=") ||
-    location.search.includes("code=")
-  );
 }
 
 async function updateAuthUI(session) {
@@ -758,102 +694,60 @@ async function updateAuthUI(session) {
   btnLogout.style.display = isIn ? "inline-block" : "none";
   authInfo.textContent = isIn ? (session.user?.email || "") : "";
 
-  // Magic-Link-Reste aus URL entfernen
-  if (
-    location.hash.includes("access_token") ||
-    location.hash.includes("refresh_token") ||
-    location.hash.includes("type=")
-  ) {
+  // Wenn du willst: URL von Tokens bereinigen
+  // (wenn Supabase nach Magic Link #access_token setzt)
+  if (location.hash && location.hash.includes("access_token")) {
     history.replaceState({}, document.title, location.pathname);
   }
 }
 
-async function showLoggedOutState() {
-  await updateAuthUI(null);
-  trainings = loadJSON(LS.trainings, []);
-  render();
-}
-
 if (supabaseClient) {
-  // LOGIN
+  // Login
   btnLogin.addEventListener("click", async () => {
     const emailInput = document.getElementById("loginEmail");
-    const savedEmail = localStorage.getItem("coach_last_login_email") || "";
-
-    if (emailInput && !emailInput.value && savedEmail) {
-      emailInput.value = savedEmail;
-    }
-
-    const email = ((emailInput?.value || "").trim()) || prompt("Email:");
-    if (!email) return;
-
-    localStorage.setItem("coach_last_login_email", email);
+const email = ((emailInput?.value || "").trim()) || prompt("Email:");
+if (!email) return;
 
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: getRedirectTo() }
     });
 
-    if (error) {
-      alert(error.message);
-    } else {
-      alert("Login-Link wurde per Email gesendet ✉️");
-    }
+    if (error) alert(error.message);
+    else alert("Login-Link wurde per Email gesendet ✉️");
   });
 
-  // LOGOUT
+  // Logout (mit Fehleranzeige)
   btnLogout.addEventListener("click", async () => {
-    const { error } = await supabaseClient.auth.signOut({ scope: "local" });
-    if (error) {
-      alert("Logout Fehler: " + error.message);
-      return;
-    }
-
-    await showLoggedOutState();
+    const { error } = await supabaseClient.auth.signOut();
+    if (error) alert("Logout Fehler: " + error.message);
   });
 
-  // Reagiert auf Login / Logout
+  // ✅ LIVE: reagiert IMMER auf Login/Logout
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-    if (session) {
-      await updateAuthUI(session);
+    await updateAuthUI(session);
 
+    // ✅ Nach Login: Trainings aus Supabase laden
+    if (session) {
       try {
         await loadTrainingsFromSupabase();
       } catch (e) {
         console.warn("loadTrainingsFromSupabase failed", e);
       }
     } else {
-      await showLoggedOutState();
+      // ✅ Nach Logout: lokale Trainings laden (damit UI nicht „tot“ wirkt)
+      trainings = loadJSON(LS.trainings, []);
+      render();
     }
   });
 
-  // Beim normalen Laden IMMER ausgeloggt starten.
-  // Nur wenn man wirklich über den Magic Link zurückkommt,
-  // darf die Session bestehen bleiben.
+  // Initialer Zustand beim Laden
   (async () => {
-    if (!isMagicLinkReturn()) {
-      try {
-        await supabaseClient.auth.signOut({ scope: "local" });
-      } catch (e) {
-        console.warn("Initial local signOut failed", e);
-      }
-
-      await showLoggedOutState();
-      return;
-    }
-
     const { data } = await supabaseClient.auth.getSession();
+    await updateAuthUI(data.session);
 
-    if (data?.session) {
-      await updateAuthUI(data.session);
-
-      try {
-        await loadTrainingsFromSupabase();
-      } catch (e) {
-        console.warn("Initial loadTrainingsFromSupabase failed", e);
-      }
-    } else {
-      await showLoggedOutState();
+    if (data.session) {
+      try { await loadTrainingsFromSupabase(); } catch (e) {}
     }
   })();
 }
