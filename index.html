@@ -705,8 +705,8 @@ if (supabaseClient) {
   // Login
   btnLogin.addEventListener("click", async () => {
     const emailInput = document.getElementById("loginEmail");
-const email = ((emailInput?.value || "").trim()) || prompt("Email:");
-if (!email) return;
+emailInput.style.display = "inline-block";
+emailInput.focus();
 
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
