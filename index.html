@@ -786,33 +786,36 @@ localStorage.setItem("coach_last_login_email", email);
     if (error) alert("Logout Fehler: " + error.message);
   });
 
-  // ✅ LIVE: reagiert IMMER auf Login/Logout
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-    await updateAuthUI(session);
+  await updateAuthUI(session);
 
-    // ✅ Nach Login: Trainings aus Supabase laden
-    if (session) {
-      try {
-        await loadTrainingsFromSupabase();
-      } catch (e) {
-        console.warn("loadTrainingsFromSupabase failed", e);
-      }
-    } else {
-      // ✅ Nach Logout: lokale Trainings laden (damit UI nicht „tot“ wirkt)
-      trainings = loadJSON(LS.trainings, []);
-      render();
+  if (session) {
+    try {
+      await loadTrainingsFromSupabase();
+    } catch (e) {
+      console.warn("loadTrainingsFromSupabase failed", e);
     }
-  });
+  } else {
+    authInfo.textContent = "";
+    btnLogin.style.display = "inline-block";
+    btnLogout.style.display = "none";
+
+    trainings = loadJSON(LS.trainings, []);
+    render();
+  }
+});
 
   // Initialer Zustand beim Laden
-  (async () => {
-    const { data } = await supabaseClient.auth.getSession();
-    await updateAuthUI(data.session);
+(async () => {
+  // Website-Passwort ist NICHT gleich Supabase-Login
+  // Deshalb starten wir immer ausgeloggt
+  await supabaseClient.auth.signOut();
 
-    if (data.session) {
-      try { await loadTrainingsFromSupabase(); } catch (e) {}
-    }
-  })();
+  await updateAuthUI(null);
+
+  trainings = loadJSON(LS.trainings, []);
+  render();
+})();
 }
 
 /* =========================
