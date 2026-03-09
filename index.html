@@ -430,32 +430,6 @@
 </head>
 
 <body>
-  <div id="loginGate" style="
-position:fixed;
-inset:0;
-background:#0b1220;
-display:flex;
-align-items:center;
-justify-content:center;
-z-index:9999;
-flex-direction:column;
-gap:12px;
-">
-
-<h2 style="color:white">Passwort</h2>
-
-<input
-id="gatePassword"
-type="password"
-placeholder="Passwort eingeben"
-style="padding:12px;border-radius:8px;border:none;font-size:16px"
-/>
-
-<button id="gateEnter" style="padding:10px 16px;font-size:16px">
-Enter
-</button>
-
-</div>
   <div class="app">
     <header>
       <div class="topbar">
@@ -471,8 +445,6 @@ Enter
           <button class="btn" id="btnOcr">OCR</button>
           <button class="btn danger" id="btnReset">Reset</button>
           <button class="btn" id="btnLogin">Login</button>
-          <input id="loginEmail" type="email" placeholder="Email" style=" display:none;padding:10px;border-radius:8px;margin-left:8px;"
-/>
           <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
           <span id="authInfo"></span>
         </div>
@@ -611,47 +583,12 @@ Enter
   <script>
 "use strict";
 
-const APP_PASSWORD = "AndiObst42!";
-
-function stopAppWithPasswordError() {
+const pw = prompt("Passwort eingeben:");
+if (pw !== "AndiObst42!") {
   document.body.innerHTML = "";
   alert("Falsches Passwort");
-  throw new Error("STOP");
+  throw new Error("STOP"); // ✅ stoppt das Script wirklich
 }
-
-function unlockAppGate() {
-  const gate = document.getElementById("loginGate");
-  if (gate) gate.style.display = "none";
-}
-
-function checkAppPassword(value) {
-  return (value || "") === APP_PASSWORD;
-}
-
-(function initPasswordGate() {
-  const gateInput = document.getElementById("gatePassword");
-  const gateBtn = document.getElementById("gateEnter");
-
-  if (!gateInput || !gateBtn) {
-    const pw = prompt("Passwort eingeben:");
-    if (!checkAppPassword(pw)) stopAppWithPasswordError();
-    return;
-  }
-
-  gateBtn.addEventListener("click", () => {
-    if (checkAppPassword(gateInput.value)) {
-      unlockAppGate();
-    } else {
-      gateInput.value = "";
-      gateInput.focus();
-      alert("Falsches Passwort");
-    }
-  });
-
-  gateInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") gateBtn.click();
-  });
-})();
 
 // =========================
 // Supabase Init (safe, darf NICHT crashen)
@@ -704,9 +641,8 @@ async function updateAuthUI(session) {
 if (supabaseClient) {
   // Login
   btnLogin.addEventListener("click", async () => {
-    const emailInput = document.getElementById("loginEmail");
-emailInput.style.display = "inline-block";
-emailInput.focus();
+    const email = prompt("Email:");
+    if (!email) return;
 
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
@@ -2082,8 +2018,8 @@ $("trDuplicate").addEventListener("click", ()=>{
   openTraining(copy.id);
   render();
 });
-
-$("trDelete").addEventListener("click", async ()=>{
+$
+    ("trDelete").addEventListener("click", async ()=>{
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
   if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
