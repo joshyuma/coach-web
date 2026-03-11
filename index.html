@@ -430,6 +430,157 @@
 </head>
 
 <body>
+  <!-- Website Gate -->
+<div id="siteGate" style="
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:rgba(11,18,32,.96);
+  padding:20px;
+">
+  <div style="
+    width:min(92vw,380px);
+    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:22px;
+    box-shadow:0 35px 90px rgba(0,0,0,.55);
+    padding:20px;
+  ">
+    <h3 style="margin:0 0 10px 0;">Coach Übungen</h3>
+    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
+      Passwort eingeben
+    </p>
+
+    <input
+      id="siteGatePassword"
+      type="password"
+      placeholder="Passwort"
+      autocomplete="current-password"
+      style="
+        width:100%;
+        padding:12px 14px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.06);
+        color:#eef3ff;
+        outline:none;
+        font-size:14px;
+        margin-bottom:12px;
+      "
+    />
+
+    <label style="
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+      color:#97a7c4;
+      margin-bottom:14px;
+    ">
+      <input id="siteGateRemember" type="checkbox" />
+      Dieses Gerät merken
+    </label>
+
+    <button
+      id="siteGateEnter"
+      style="
+        width:100%;
+        padding:12px 14px;
+        border-radius:999px;
+        border:0;
+        font-weight:900;
+        cursor:pointer;
+        background:linear-gradient(135deg,#ff7a00,#ffb25a);
+        color:#1a1208;
+      "
+    >
+      Enter
+    </button>
+  </div>
+</div>
+
+<!-- Login Email Modal -->
+<div id="emailLoginModal" style="
+  position:fixed;
+  inset:0;
+  z-index:9998;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,.55);
+  padding:20px;
+">
+  <div style="
+    width:min(92vw,380px);
+    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:22px;
+    box-shadow:0 35px 90px rgba(0,0,0,.55);
+    padding:20px;
+  ">
+    <h3 style="margin:0 0 10px 0;">Login</h3>
+    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
+      E-Mail für den Magic Link
+    </p>
+
+    <input
+      id="emailLoginInput"
+      type="email"
+      placeholder="E-Mail"
+      autocomplete="email"
+      inputmode="email"
+      style="
+        width:100%;
+        padding:12px 14px;
+        border-radius:14px;
+        border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.06);
+        color:#eef3ff;
+        outline:none;
+        font-size:14px;
+        margin-bottom:12px;
+      "
+    />
+
+    <div style="display:flex; gap:10px;">
+      <button
+        id="emailLoginCancel"
+        style="
+          flex:1;
+          padding:12px 14px;
+          border-radius:999px;
+          border:1px solid rgba(255,255,255,.10);
+          background:rgba(255,255,255,.06);
+          color:#eef3ff;
+          font-weight:900;
+          cursor:pointer;
+        "
+      >
+        Abbrechen
+      </button>
+
+      <button
+        id="emailLoginSend"
+        style="
+          flex:1;
+          padding:12px 14px;
+          border-radius:999px;
+          border:0;
+          font-weight:900;
+          cursor:pointer;
+          background:linear-gradient(135deg,#ff7a00,#ffb25a);
+          color:#1a1208;
+        "
+      >
+        Link senden
+      </button>
+    </div>
+  </div>
+</div>
+
   <div class="app">
     <header>
       <div class="topbar">
@@ -583,12 +734,76 @@
   <script>
 "use strict";
 
-const pw = prompt("Passwort eingeben:");
-if (pw !== "AndiObst42!") {
-  document.body.innerHTML = "";
-  alert("Falsches Passwort");
-  throw new Error("STOP"); // ✅ stoppt das Script wirklich
+const APP_PASSWORD = "AndiObst42!";
+const SITE_GATE_KEY = "coach_site_gate_unlocked_v1";
+const LAST_LOGIN_EMAIL_KEY = "coach_last_login_email_v1";
+
+function hideSiteGate() {
+  const gate = document.getElementById("siteGate");
+  if (gate) gate.style.display = "none";
 }
+
+function showSiteGate() {
+  const gate = document.getElementById("siteGate");
+  if (gate) gate.style.display = "flex";
+}
+
+function isSiteUnlocked() {
+  return localStorage.getItem(SITE_GATE_KEY) === "1";
+}
+
+function unlockSite(rememberDevice) {
+  if (rememberDevice) {
+    localStorage.setItem(SITE_GATE_KEY, "1");
+  }
+  hideSiteGate();
+}
+
+function stopAppWithPasswordError() {
+  alert("Falsches Passwort");
+}
+
+(function initSiteGate() {
+  const gate = document.getElementById("siteGate");
+  const pwInput = document.getElementById("siteGatePassword");
+  const rememberBox = document.getElementById("siteGateRemember");
+  const enterBtn = document.getElementById("siteGateEnter");
+
+  if (!gate || !pwInput || !rememberBox || !enterBtn) {
+    const pw = prompt("Passwort eingeben:");
+    if (pw !== APP_PASSWORD) {
+      document.body.innerHTML = "";
+      alert("Falsches Passwort");
+      throw new Error("STOP");
+    }
+    return;
+  }
+
+  if (isSiteUnlocked()) {
+    hideSiteGate();
+    return;
+  }
+
+  showSiteGate();
+
+  const submitGate = () => {
+    if (pwInput.value === APP_PASSWORD) {
+      unlockSite(rememberBox.checked);
+      return;
+    }
+
+    pwInput.value = "";
+    pwInput.focus();
+    stopAppWithPasswordError();
+  };
+
+  enterBtn.addEventListener("click", submitGate);
+  pwInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitGate();
+  });
+
+  setTimeout(() => pwInput.focus(), 50);
+})();
 
 // =========================
 // Supabase Init (safe, darf NICHT crashen)
@@ -641,6 +856,12 @@ async function updateAuthUI(session) {
 if (supabaseClient) {
   // Login
   btnLogin.addEventListener("click", async () => {
+  const modal = document.getElementById("emailLoginModal");
+  const input = document.getElementById("emailLoginInput");
+  const sendBtn = document.getElementById("emailLoginSend");
+  const cancelBtn = document.getElementById("emailLoginCancel");
+
+  if (!modal || !input || !sendBtn || !cancelBtn) {
     const email = prompt("Email:");
     if (!email) return;
 
@@ -651,7 +872,51 @@ if (supabaseClient) {
 
     if (error) alert(error.message);
     else alert("Login-Link wurde per Email gesendet ✉️");
-  });
+    return;
+  }
+
+  const savedEmail = localStorage.getItem(LAST_LOGIN_EMAIL_KEY) || "";
+  input.value = savedEmail;
+
+  modal.style.display = "flex";
+
+  const closeModal = () => {
+    modal.style.display = "none";
+  };
+
+  const submitEmail = async () => {
+    const email = (input.value || "").trim();
+    if (!email) {
+      input.focus();
+      return;
+    }
+
+    localStorage.setItem(LAST_LOGIN_EMAIL_KEY, email);
+
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: getRedirectTo() }
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    closeModal();
+    alert("Login-Link wurde per Email gesendet ✉️");
+  };
+
+  sendBtn.onclick = submitEmail;
+  cancelBtn.onclick = closeModal;
+
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") submitEmail();
+    if (e.key === "Escape") closeModal();
+  };
+
+  setTimeout(() => input.focus(), 50);
+});
 
   // Logout (mit Fehleranzeige)
   btnLogout.addEventListener("click", async () => {
@@ -2018,8 +2283,8 @@ $("trDuplicate").addEventListener("click", ()=>{
   openTraining(copy.id);
   render();
 });
-$
-    ("trDelete").addEventListener("click", async ()=>{
+
+$("trDelete").addEventListener("click", async ()=>{
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
   if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
