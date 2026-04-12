@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ff8c00"/>
+      <stop offset="100%" stop-color="#ff4400"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Soccer field top-down view (simplified) -->
+  <!-- Outer field rectangle -->
+  <rect x="80" y="108" width="352" height="296" rx="14" fill="none" stroke="white" stroke-width="22" opacity="0.95"/>
+  <!-- Center line -->
+  <line x1="256" y1="108" x2="256" y2="404" stroke="white" stroke-width="22" opacity="0.95"/>
+  <!-- Center circle -->
+  <circle cx="256" cy="256" r="66" fill="none" stroke="white" stroke-width="22" opacity="0.95"/>
+  <!-- Center dot -->
+  <circle cx="256" cy="256" r="12" fill="white" opacity="0.95"/>
+</svg>
