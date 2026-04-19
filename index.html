@@ -846,22 +846,17 @@ try {
     throw new Error("Supabase library not loaded (window.supabase.createClient fehlt)");
   }
 
-  // Einmalige Migration: alte/kaputte Auth-Reste wegräumen (z.B. PKCE-Verifier-Leichen).
-  // Läuft nur EINMAL pro Gerät, damit neue persistente Sessions nicht ständig gelöscht werden.
-  const AUTH_MIGRATION_KEY = "coach-auth-migration-v2";
-  if (!localStorage.getItem(AUTH_MIGRATION_KEY)) {
-    Object.keys(localStorage)
-      .filter(k => k.startsWith("sb-") || k === "supabase.auth.token")
-      .forEach(k => localStorage.removeItem(k));
-    localStorage.setItem(AUTH_MIGRATION_KEY, "1");
-  }
+  // Alle alten gespeicherten Sessions aus localStorage löschen
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("sb-") || k === "supabase.auth.token")
+    .forEach(k => localStorage.removeItem(k));
 
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-      flowType: 'implicit',     // bewährt – hat für beide Geräte funktioniert
-      persistSession: true,     // Session in localStorage – überlebt iOS App-Offload
-      autoRefreshToken: true,   // Token erneuert sich automatisch – keine 1h-Falle
-      detectSessionInUrl: true  // Magic Link aus URL lesen
+      flowType: 'implicit',
+      persistSession: false,   // Session nur im RAM – Tab zu = ausgeloggt
+      autoRefreshToken: false, // kein automatisches Token-Refresh
+      detectSessionInUrl: true // Magic Link aus URL lesen
     }
   });
   console.log("Supabase ready ✅", SUPABASE_URL);
