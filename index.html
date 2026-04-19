@@ -242,25 +242,22 @@
     }
     .card:active{transform:scale(.98)}
     /* Training cards stay horizontal */
+    .list--trainings{grid-template-columns:1fr}
     .card[data-tr]{
       flex-direction:row;
-      align-items:stretch;
-      padding:0;
+      align-items:center;
+      padding:14px 16px;
     }
-    .card[data-tr] .thumb{
-      width:64px; height:auto;
-      aspect-ratio:1;
-      flex:0 0 64px;
-      border-radius:0;
-      border-right:1px solid #f0f4f8;
-    }
+    .card[data-tr] .thumb{display:none}
+    .card[data-tr] .meta{padding:0;flex:1;min-width:0}
+    .card[data-tr] .meta .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+    .card[data-tr] .meta .s{margin-top:4px}
     .card[data-tr] .iconbtn{
       position:static;
       align-self:center;
       flex:0 0 auto;
-      margin-right:10px;
+      margin-left:10px;
     }
-    .card[data-tr] .meta{padding:12px}
     .thumb{
       width:100%;
       aspect-ratio:4/3;
@@ -1844,6 +1841,7 @@ function setTab(tab){
   $("tabTrainings").setAttribute("data-on", tab==="trainings" ? "1":"0");
   $("tabFavs").setAttribute("data-on", tab==="favs" ? "1":"0");
 
+  listEl.classList.toggle("list--trainings", tab==="trainings");
   if(tab==="trainings"){
     $("rightTitle").textContent = "Trainings";
     $("rightSub").textContent = "Training öffnen → Reihenfolge → Export als PDF";
@@ -1957,13 +1955,14 @@ function renderTrainings(){
   const sorted = trainings.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
   listEl.innerHTML = sorted.map(tr=>{
     const n = (tr.items||[]).length;
+    const d = new Date(tr.updatedAt||tr.createdAt||Date.now());
+    const dateStr = d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});
     return `<div class="card" data-tr="${escapeHTML(tr.id)}" role="button" tabindex="0">
       <div class="thumb"><div class="ph">TR</div></div>
       <div class="meta">
         <p class="t">${escapeHTML(tr.name)}</p>
         <div class="s">
-          <span class="pill">🧩 ${n} Übung${n===1?"":"en"}</span>
-          <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||tr.createdAt||Date.now()).toLocaleString())}</span>
+          <span class="pill">📅 ${dateStr}</span>
         </div>
       </div>
       <button class="iconbtn" aria-label="Bearbeiten">✎</button>
