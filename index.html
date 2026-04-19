@@ -848,9 +848,9 @@ try {
 
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
-      flowType: 'implicit',     // bewährt – hat für Login sauber funktioniert
-      persistSession: true,     // Session überlebt Reload – kein stilles Ausloggen
-      autoRefreshToken: true,   // Token erneuert sich automatisch – fixt 1h-Ablauf
+      flowType: 'pkce',         // iOS 18 / Safari 18 safe (query params statt URL-Hash)
+      persistSession: true,     // Session in localStorage – überlebt Reload
+      autoRefreshToken: true,   // Token automatisch erneuern – keine 1h Ablauf-Falle
       detectSessionInUrl: true  // Magic Link aus URL lesen
     }
   });
