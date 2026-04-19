@@ -846,8 +846,18 @@ try {
     throw new Error("Supabase library not loaded (window.supabase.createClient fehlt)");
   }
 
+  // Alle alten gespeicherten Sessions aus localStorage löschen
+  Object.keys(localStorage)
+    .filter(k => k.startsWith("sb-") || k === "supabase.auth.token")
+    .forEach(k => localStorage.removeItem(k));
+
   supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { flowType: 'implicit' }
+    auth: {
+      flowType: 'implicit',
+      persistSession: false,   // Session nur im RAM – Tab zu = ausgeloggt
+      autoRefreshToken: false, // kein automatisches Token-Refresh
+      detectSessionInUrl: true // Magic Link aus URL lesen
+    }
   });
   console.log("Supabase ready ✅", SUPABASE_URL);
 } catch (e) {
@@ -905,9 +915,7 @@ if (supabaseClient) {
     return;
   }
 
-  const savedEmail = localStorage.getItem(LAST_LOGIN_EMAIL_KEY) || "";
-  input.value = savedEmail;
-
+  input.value = "";
   modal.style.display = "flex";
 
   const closeModal = () => {
@@ -948,14 +956,10 @@ if (supabaseClient) {
 
   // Logout
   btnLogout.addEventListener("click", async () => {
-    // global scope invalidiert den Refresh-Token auch server-seitig
     await supabaseClient.auth.signOut({ scope: "global" }).catch(() => {});
-    // Alle möglichen Supabase-Auth-Keys löschen
-    Object.keys(localStorage)
-      .filter(k => k.startsWith("sb-") || k === "supabase.auth.token")
-      .forEach(k => localStorage.removeItem(k));
-    // Neu laden ohne Hash (damit kein implicit-Flow-Token übrig bleibt)
-    window.location.replace(window.location.pathname);
+    await updateAuthUI(null);
+    trainings = loadJSON(LS.trainings, []);
+    render();
   });
 
   // LIVE: reagiert auf Login/Logout
