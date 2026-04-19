@@ -623,7 +623,6 @@
           </div>
         </div>
         <div class="hActions">
-          <button class="btn" id="btnOcr">OCR</button>
           <button class="btn" id="btnLogin">Login</button>
           <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
           <span id="authInfo"></span>
@@ -949,10 +948,13 @@ if (supabaseClient) {
   setTimeout(() => input.focus(), 50);
 });
 
-  // Logout (mit Fehleranzeige)
+  // Logout
   btnLogout.addEventListener("click", async () => {
     const { error } = await supabaseClient.auth.signOut();
-    if (error) alert("Logout Fehler: " + error.message);
+    if (error) { alert("Logout Fehler: " + error.message); return; }
+    await updateAuthUI(null);
+    trainings = loadJSON(LS.trainings, []);
+    render();
   });
 
   // ✅ LIVE: reagiert IMMER auf Login/Logout
@@ -2480,15 +2482,6 @@ $("trExportPdf").addEventListener("click", async ()=>{
   doc.save(safe + ".pdf");
 });
 
-/* =========================
-   OCR Button
-========================= */
-$("btnOcr").addEventListener("click", async ()=>{
-  alert("OCR Download startet.");
-  await buildOcrIndex(EXERCISES);
-  alert("OCR fertig gedownloaded.");
-  render();
-});
 
 /* =========================
    Tabs, Search, Shortcuts
@@ -2524,6 +2517,9 @@ document.addEventListener("keydown",(e)=>{
 
   renderChips();
   setTab(activeTab);
+
+  // OCR im Hintergrund — füllt ex.ocrText für die Suche
+  buildOcrIndex(EXERCISES).then(() => render());
 
 })();
 
