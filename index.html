@@ -2,7 +2,11 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,minimum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Coach" />
   <title>Coach Übungen</title>
   <meta name="theme-color" content="#ec6f1f" />
   <link rel="manifest" href="manifest.webmanifest" />
@@ -48,7 +52,12 @@
     }
 
     *{box-sizing:border-box}
-    html,body{height:100%}
+    html,body{
+      height:100%;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
     body{
       margin:0;
       font-family: var(--font-display);
@@ -58,7 +67,18 @@
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior-y: none;
     }
+    input, textarea{
+      -webkit-user-select: text;
+      user-select: text;
+      -webkit-touch-callout: default;
+      font-size: 16px; /* prevents iOS Safari auto-zoom on focus */
+    }
+    img{ -webkit-user-drag: none; user-drag: none; pointer-events: auto; }
 
     ::selection{ background: var(--accent-soft); color: var(--ink); }
 
@@ -234,7 +254,7 @@
       background: transparent;
       color: var(--ink);
       font-family: inherit;
-      font-size: 15px;
+      font-size: 16px;
       letter-spacing: -0.01em;
     }
     .field input::placeholder{ color: var(--ink-3); }
@@ -627,7 +647,7 @@
       outline:none;
       resize: vertical;
       font-family: inherit;
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1.5;
       letter-spacing: -0.01em;
       transition: border-color 140ms ease-out;
@@ -822,6 +842,19 @@
 
   <script>
 "use strict";
+
+/* =========================
+   Native-app behavior: no zoom
+========================= */
+document.addEventListener("gesturestart",  (e) => e.preventDefault());
+document.addEventListener("gesturechange", (e) => e.preventDefault());
+document.addEventListener("gestureend",    (e) => e.preventDefault());
+let __lastTouchEnd = 0;
+document.addEventListener("touchend", (e) => {
+  const now = Date.now();
+  if (now - __lastTouchEnd < 350) e.preventDefault();
+  __lastTouchEnd = now;
+}, { passive: false });
 
 /* =========================
    OCR ADDON
