@@ -4,9 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Coach Übungen</title>
-  <meta name="theme-color" content="#ff7a00" />
+  <meta name="theme-color" content="#ec6f1f" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="assets/icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
   <style>
     :root{
       /* OKLCH tinted neutrals — warm side */
@@ -93,22 +95,11 @@
       min-width:0;
     }
     .mark{
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 8px;
-      background: var(--ink);
-      color: var(--bg);
-      display:grid;
-      place-items:center;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: -.02em;
       flex: 0 0 auto;
-    }
-    .mark .dot{
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--accent);
+      display: block;
     }
     .titlewrap{min-width:0; display:flex; align-items:baseline; gap: var(--s-2); flex-wrap:wrap;}
     .title{
@@ -705,7 +696,7 @@
     <header>
       <div class="topbar">
         <div class="brand">
-          <div class="mark" aria-hidden="true"><span class="dot"></span></div>
+          <img class="mark" src="assets/icon.svg" alt="" aria-hidden="true" />
           <div class="titlewrap">
             <p class="title">Coach Übungen</p>
             <p class="subtitle" id="subline">Drill Library</p>
