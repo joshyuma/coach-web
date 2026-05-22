@@ -457,161 +457,9 @@
     code{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
   </style>
   <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
-  <!-- Website Gate -->
-<div id="siteGate" style="
-  position:fixed;
-  inset:0;
-  z-index:9999;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:rgba(11,18,32,.96);
-  padding:20px;
-">
-  <div style="
-    width:min(92vw,380px);
-    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
-    border:1px solid rgba(255,255,255,.10);
-    border-radius:22px;
-    box-shadow:0 35px 90px rgba(0,0,0,.55);
-    padding:20px;
-  ">
-    <h3 style="margin:0 0 10px 0;">Coach Übungen</h3>
-    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
-      Passwort eingeben
-    </p>
-
-    <input
-      id="siteGatePassword"
-      type="password"
-      placeholder="Passwort"
-      autocomplete="current-password"
-      style="
-        width:100%;
-        padding:12px 14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.10);
-        background:rgba(255,255,255,.06);
-        color:#eef3ff;
-        outline:none;
-        font-size:14px;
-        margin-bottom:12px;
-      "
-    />
-
-    <label style="
-      display:flex;
-      align-items:center;
-      gap:8px;
-      font-size:13px;
-      color:#97a7c4;
-      margin-bottom:14px;
-    ">
-      <input id="siteGateRemember" type="checkbox" />
-      Dieses Gerät merken
-    </label>
-
-    <button
-      id="siteGateEnter"
-      style="
-        width:100%;
-        padding:12px 14px;
-        border-radius:999px;
-        border:0;
-        font-weight:900;
-        cursor:pointer;
-        background:linear-gradient(135deg,#ff7a00,#ffb25a);
-        color:#1a1208;
-      "
-    >
-      Enter
-    </button>
-  </div>
-</div>
-
-<!-- Login Email Modal -->
-<div id="emailLoginModal" style="
-  position:fixed;
-  inset:0;
-  z-index:9998;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  background:rgba(0,0,0,.55);
-  padding:20px;
-">
-  <div style="
-    width:min(92vw,380px);
-    background:linear-gradient(180deg, rgba(16,30,56,.98), rgba(16,30,56,.88));
-    border:1px solid rgba(255,255,255,.10);
-    border-radius:22px;
-    box-shadow:0 35px 90px rgba(0,0,0,.55);
-    padding:20px;
-  ">
-    <h3 style="margin:0 0 10px 0;">Login</h3>
-    <p style="margin:0 0 12px 0; color:#97a7c4; font-size:13px;">
-      E-Mail für den Magic Link
-    </p>
-
-    <input
-      id="emailLoginInput"
-      type="email"
-      placeholder="E-Mail"
-      autocomplete="email"
-      inputmode="email"
-      style="
-        width:100%;
-        padding:12px 14px;
-        border-radius:14px;
-        border:1px solid rgba(255,255,255,.10);
-        background:rgba(255,255,255,.06);
-        color:#eef3ff;
-        outline:none;
-        font-size:14px;
-        margin-bottom:12px;
-      "
-    />
-
-    <div style="display:flex; gap:10px;">
-      <button
-        id="emailLoginCancel"
-        style="
-          flex:1;
-          padding:12px 14px;
-          border-radius:999px;
-          border:1px solid rgba(255,255,255,.10);
-          background:rgba(255,255,255,.06);
-          color:#eef3ff;
-          font-weight:900;
-          cursor:pointer;
-        "
-      >
-        Abbrechen
-      </button>
-
-      <button
-        id="emailLoginSend"
-        style="
-          flex:1;
-          padding:12px 14px;
-          border-radius:999px;
-          border:0;
-          font-weight:900;
-          cursor:pointer;
-          background:linear-gradient(135deg,#ff7a00,#ffb25a);
-          color:#1a1208;
-        "
-      >
-        Link senden
-      </button>
-    </div>
-  </div>
-</div>
-
   <div class="app">
     <header>
       <div class="topbar">
@@ -621,11 +469,6 @@
             <p class="title">Coach Übungen</p>
             <p class="subtitle" id="subline">Kategorien nach Inhaltsverzeichnis • Trainings • PDF Export</p>
           </div>
-        </div>
-        <div class="hActions">
-          <button class="btn" id="btnLogin">Login</button>
-          <button class="btn danger" id="btnLogout" style="display:none;">Logout</button>
-          <span id="authInfo"></span>
         </div>
       </div>
     </header>
@@ -761,236 +604,6 @@
 
   <script>
 "use strict";
-
-const APP_PASSWORD = "AndiObst42!";
-const SITE_GATE_KEY = "coach_site_gate_unlocked_v1";
-const LAST_LOGIN_EMAIL_KEY = "coach_last_login_email_v1";
-
-function hideSiteGate() {
-  const gate = document.getElementById("siteGate");
-  if (gate) gate.style.display = "none";
-}
-
-function showSiteGate() {
-  const gate = document.getElementById("siteGate");
-  if (gate) gate.style.display = "flex";
-}
-
-function isSiteUnlocked() {
-  return localStorage.getItem(SITE_GATE_KEY) === "1";
-}
-
-function unlockSite(rememberDevice) {
-  if (rememberDevice) {
-    localStorage.setItem(SITE_GATE_KEY, "1");
-  }
-  hideSiteGate();
-}
-
-function stopAppWithPasswordError() {
-  alert("Falsches Passwort");
-}
-
-(function initSiteGate() {
-  const gate = document.getElementById("siteGate");
-  const pwInput = document.getElementById("siteGatePassword");
-  const rememberBox = document.getElementById("siteGateRemember");
-  const enterBtn = document.getElementById("siteGateEnter");
-
-  if (!gate || !pwInput || !rememberBox || !enterBtn) {
-    const pw = prompt("Passwort eingeben:");
-    if (pw !== APP_PASSWORD) {
-      document.body.innerHTML = "";
-      alert("Falsches Passwort");
-      throw new Error("STOP");
-    }
-    return;
-  }
-
-  if (isSiteUnlocked()) {
-    hideSiteGate();
-    return;
-  }
-
-  showSiteGate();
-
-  const submitGate = () => {
-    if (pwInput.value === APP_PASSWORD) {
-      unlockSite(rememberBox.checked);
-      return;
-    }
-
-    pwInput.value = "";
-    pwInput.focus();
-    stopAppWithPasswordError();
-  };
-
-  enterBtn.addEventListener("click", submitGate);
-  pwInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") submitGate();
-  });
-
-  setTimeout(() => pwInput.focus(), 50);
-})();
-
-// =========================
-// Supabase Init (safe, darf NICHT crashen)
-// =========================
-let supabaseClient = null;
-
-try {
-  const SUPABASE_URL = "https://yvzneuettfhnejlpmuck.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_R8JlQ1KY0EKLZjHZbkXTng_TUFbWbUo";
-
-  if (!window.supabase?.createClient) {
-    throw new Error("Supabase library not loaded (window.supabase.createClient fehlt)");
-  }
-
-  // Alle alten gespeicherten Sessions aus localStorage löschen
-  Object.keys(localStorage)
-    .filter(k => k.startsWith("sb-") || k === "supabase.auth.token")
-    .forEach(k => localStorage.removeItem(k));
-
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      flowType: 'implicit',
-      persistSession: false,   // Session nur im RAM – Tab zu = ausgeloggt
-      autoRefreshToken: false, // kein automatisches Token-Refresh
-      detectSessionInUrl: true // Magic Link aus URL lesen
-    }
-  });
-  console.log("Supabase ready ✅", SUPABASE_URL);
-} catch (e) {
-  console.warn("Supabase disabled – App läuft lokal weiter ✅", e);
-}
-
-// =========================
-// AUTH UI (FIXED + LIVE UPDATES)
-// =========================
-const btnLogin = document.getElementById("btnLogin");
-const btnLogout = document.getElementById("btnLogout");
-const authInfo = document.getElementById("authInfo");
-
-function getRedirectTo() {
-  const u = new URL(window.location.href);
-  u.hash = "";
-  // wichtig: query behalten ist optional – ich entferne sie wie bei dir
-  u.search = "";
-  return u.toString();
-}
-
-async function updateAuthUI(session) {
-  const isIn = !!session;
-
-  btnLogin.style.display = isIn ? "none" : "inline-block";
-  btnLogout.style.display = isIn ? "inline-block" : "none";
-  authInfo.textContent = isIn ? (session.user?.email || "") : "";
-
-  // Wenn du willst: URL von Tokens bereinigen
-  // (wenn Supabase nach Magic Link #access_token setzt)
-  if (location.hash && location.hash.includes("access_token")) {
-    history.replaceState({}, document.title, location.pathname);
-  }
-}
-
-if (supabaseClient) {
-  // Login
-  btnLogin.addEventListener("click", async () => {
-  const modal = document.getElementById("emailLoginModal");
-  const input = document.getElementById("emailLoginInput");
-  const sendBtn = document.getElementById("emailLoginSend");
-  const cancelBtn = document.getElementById("emailLoginCancel");
-
-  if (!modal || !input || !sendBtn || !cancelBtn) {
-    const email = prompt("Email:");
-    if (!email) return;
-
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: getRedirectTo() }
-    });
-
-    if (error) alert(error.message);
-    else alert("Login-Link wurde per Email gesendet ✉️");
-    return;
-  }
-
-  input.value = "";
-  modal.style.display = "flex";
-
-  const closeModal = () => {
-    modal.style.display = "none";
-  };
-
-  const submitEmail = async () => {
-    const email = (input.value || "").trim();
-    if (!email) {
-      input.focus();
-      return;
-    }
-
-    const { error } = await supabaseClient.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: getRedirectTo() }
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    closeModal();
-    alert("Login-Link wurde per Email gesendet ✉️");
-  };
-
-  sendBtn.onclick = submitEmail;
-  cancelBtn.onclick = closeModal;
-
-  input.onkeydown = (e) => {
-    if (e.key === "Enter") submitEmail();
-    if (e.key === "Escape") closeModal();
-  };
-
-  setTimeout(() => input.focus(), 50);
-});
-
-  // Logout
-  btnLogout.addEventListener("click", async () => {
-    await supabaseClient.auth.signOut({ scope: "global" }).catch(() => {});
-    await updateAuthUI(null);
-    trainings = loadJSON(LS.trainings, []);
-    render();
-  });
-
-  // LIVE: reagiert auf Login/Logout
-  supabaseClient.auth.onAuthStateChange(async (event, session) => {
-    if (event === "SIGNED_OUT") { await updateAuthUI(null); return; }
-    await updateAuthUI(session);
-
-    // ✅ Nach Login: Trainings aus Supabase laden
-    if (session) {
-      try {
-        await loadTrainingsFromSupabase();
-      } catch (e) {
-        console.warn("loadTrainingsFromSupabase failed", e);
-      }
-    } else {
-      // ✅ Nach Logout: lokale Trainings laden (damit UI nicht „tot“ wirkt)
-      trainings = loadJSON(LS.trainings, []);
-      render();
-    }
-  });
-
-  // Initialer Zustand beim Laden
-  (async () => {
-    const { data } = await supabaseClient.auth.getSession();
-    await updateAuthUI(data.session);
-
-    if (data.session) {
-      try { await loadTrainingsFromSupabase(); } catch (e) {}
-    }
-  })();
-}
 
 /* =========================
    OCR ADDON
@@ -1550,7 +1163,6 @@ function sortByNumberSuffix(a,b){
 }
 
 function nowId() {
-  // echte UUID für Supabase
   if (crypto?.randomUUID) return crypto.randomUUID();
 
   // Fallback
@@ -1601,109 +1213,7 @@ let activeTab = loadJSON(LS.tab, "exercises"); // exercises|trainings|favs
 let selectedCats = loadJSON(LS.cats, []);      // category filters
 let favorites = new Set(loadJSON(LS.fav, []));
 let notesById = loadJSON(LS.notes, {});
-let trainings = [];
-
-// ======================================================
-// Supabase Persist Layer (Trainings) – single source of truth
-// ======================================================
-
-const _saveTimersById = new Map();
-
-async function sbUser(){
-  if(!supabaseClient) return null;
-  const { data, error } = await supabaseClient.auth.getUser();
-  if(error) return null;
-  return data?.user || null;
-}
-
-// Speichert ALLES (Name + items + Reihenfolge + etc.)
-async function saveTrainingToSupabase(tr){
-  if(!supabaseClient) return;
-
-  const { data: uData, error: uErr } = await supabaseClient.auth.getUser();
-  const user = uData?.user;
-  if(uErr || !user) return;
-
-  const row = {
-    id: tr.id,                          // uuid
-    user_id: user.id,                   // uuid
-    title: tr.name || "Training",       // text
-    category: tr.category ?? null,      // text
-    frames: Array.isArray(tr.items) ? tr.items : [],  // jsonb
-    updated_at: new Date().toISOString(),
-    data: tr
-  };
-
-  const { error } = await supabaseClient
-    .from("trainings")
-    .upsert(row, { onConflict: "id" });
-
-  if(error) console.warn("Supabase save failed:", error);
-}
-
-function queueSaveTraining(tr, delayMs = 250) {
-  if (!supabaseClient || !tr?.id) return;
-
-  const old = _saveTimersById.get(tr.id);
-  if (old) clearTimeout(old);
-
-  const t = setTimeout(async () => {
-    _saveTimersById.delete(tr.id);
-    try {
-      await saveTrainingToSupabase(tr);
-    } catch (e) {
-      console.warn("saveTrainingToSupabase failed:", e);
-    }
-  }, delayMs);
-
-  _saveTimersById.set(tr.id, t);
-}
-
-async function deleteTrainingFromSupabase(trainingId){
-  if(!supabaseClient) return;
-
-  const user = await sbUser();
-  if(!user) return;
-
-  const { error } = await supabaseClient
-    .from("trainings")
-    .delete()
-    .eq("id", trainingId)
-    .eq("user_id", user.id);
-
-  if(error) console.warn("Supabase delete failed:", error);
-}
-
-
-async function loadTrainingsFromSupabase() {
-  if (!supabaseClient) return;
-
-  const { data: uData, error: uErr } = await supabaseClient.auth.getUser();
-  const user = uData?.user;
-  if (uErr || !user) return;
-
-  const { data, error } = await supabaseClient
-    .from("trainings")
-    .select("*")
-    .eq("user_id", user.id)                 // ✅ NUR eigener User
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    console.warn("Load failed:", error);
-    return;
-  }
-
-  trainings = (data || []).map(t => ({
-    id: t.id,
-    name: t.title,
-    items: t.frames || [],
-    createdAt: t.created_at ? new Date(t.created_at).getTime() : Date.now(),
-    updatedAt: t.updated_at ? new Date(t.updated_at).getTime() : Date.now()
-  }));
-
-  saveJSON(LS.trainings, trainings);  // optional aber hilfreich
-  render();
-}
+let trainings = loadJSON(LS.trainings, []);
 
 let catOverrides = loadJSON(LS.catOverrides, {}); // exerciseId -> category
 let EXERCISES = []; // loaded from manifest/listing
@@ -2134,7 +1644,6 @@ $("addCreate").addEventListener("click", ()=>{
   const tr = { id: nowId(), name: name.trim(), items: [], createdAt: Date.now(), updatedAt: Date.now() };
   trainings = [tr, ...trainings];
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
   renderAddList();
   render();
 });
@@ -2156,9 +1665,6 @@ async function addExerciseToTraining(trainingId, exerciseId){
 
   trainings[idx] = tr;
   saveJSON(LS.trainings, trainings);
-// 👉 Supabase sync
-  queueSaveTraining(tr);
-  
   render();
 
 }
@@ -2167,11 +1673,10 @@ async function addExerciseToTraining(trainingId, exerciseId){
    Training CRUD + Editor
 ====================== */
 
-$("btnNewTraining").addEventListener("click", async () => {
+$("btnNewTraining").addEventListener("click", () => {
   const name = prompt("Name für neues Training:", "Training " + (trainings.length + 1));
   if (!name) return;
 
-  // neues Training-Objekt (lokal)
   const tr = {
     id: nowId(),
     name: name.trim(),
@@ -2180,13 +1685,10 @@ $("btnNewTraining").addEventListener("click", async () => {
     updatedAt: Date.now(),
   };
 
-  // lokal sofort anlegen (damit UI direkt reagiert)
   trainings = [tr, ...trainings];
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
   setTab("trainings");
   render();
-
 });
 
 let currentTrainingId = null;
@@ -2276,7 +1778,6 @@ function trainingAction(act, idx){
   tr.updatedAt = Date.now();
   trainings[tIdx]=tr;
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
 
   $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
     <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
@@ -2295,7 +1796,6 @@ $("trRename").addEventListener("click", ()=>{
   tr.updatedAt = Date.now();
   trainings[tIdx]=tr;
   saveJSON(LS.trainings, trainings);
-  queueSaveTraining(tr);
   $("trTitle").textContent = tr.name;
   $("trMeta").innerHTML = `<span class="pill">🧩 ${(tr.items||[]).length} Übungen</span>
     <span class="pill">🕒 ${escapeHTML(new Date(tr.updatedAt||Date.now()).toLocaleString())}</span>`;
@@ -2317,24 +1817,18 @@ $("trDuplicate").addEventListener("click", ()=>{
   trainings = [copy, ...trainings];
   saveJSON(LS.trainings, trainings);
 
-  // ✅ Supabase: die KOPIE speichern
-  queueSaveTraining(copy);
-
   alert("Dupliziert ✅");
   openTraining(copy.id);
   render();
 });
 
-$("trDelete").addEventListener("click", async ()=>{
+$("trDelete").addEventListener("click", ()=>{
   const tr = trainings.find(t=>t.id===currentTrainingId);
   if(!tr) return;
   if(!confirm("Training wirklich löschen?\n\n" + tr.name)) return;
 
   trainings = trainings.filter(t=>t.id!==currentTrainingId);
   saveJSON(LS.trainings, trainings);
-
-  // ✅ Supabase wirklich löschen
-  await deleteTrainingFromSupabase(tr.id);
 
   closeTraining();
   render();
